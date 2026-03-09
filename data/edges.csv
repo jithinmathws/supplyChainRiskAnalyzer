@@ -1,0 +1,5 @@
+source,target,transport_mode,distance,transport_time
+3,4,Rail,3000,5
+4,1,Road,1500,2
+1,2,Shipping,20000,30
+2,5,Road,500,1

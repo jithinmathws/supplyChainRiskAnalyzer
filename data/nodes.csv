@@ -1,0 +1,6 @@
+node_id,name,type,location,capacity
+1,Shanghai Port,Port,China,High
+2,Rotterdam Port,Port,Netherlands,High
+3,Supplier A,Supplier,Vietnam,Medium
+4,Factory B,Factory,India,Large
+5,Warehouse D,Warehouse,Germany,Medium
