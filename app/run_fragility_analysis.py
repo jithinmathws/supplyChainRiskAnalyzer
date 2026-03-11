@@ -1,5 +1,6 @@
 from core.graph_builder import SupplyChainGraph
 from analysis.bottleneck_detection import BottleneckDetector
+from analysis.edge_bottleneck_detection import EdgeBottleneckDetector
 from visualization.fragility_plots import FragilityVisualizer
 
 
@@ -14,33 +15,85 @@ def main():
     builder.load_data()
     G = builder.build_graph()
 
-    detector = BottleneckDetector(G)
+    # -------------------------------
+    # NODE BOTTLENECK ANALYSIS
+    # -------------------------------
+    node_detector = BottleneckDetector(G)
 
-    result_df = detector.rank_node_bottlenecks(
+    node_result_df = node_detector.rank_node_bottlenecks(
         source_id=source_id,
         target_id=target_id,
         exclude_terminals=True
     )
 
-    summary = detector.summary_report(
+    node_summary = node_detector.summary_report(
         source_id=source_id,
         target_id=target_id,
         exclude_terminals=True
     )
 
-    print("\n--- Node Bottleneck Ranking ---")
-    print(result_df.to_string(index=False))
+    print("\n=== NODE BOTTLENECK RANKING ===")
+    print(node_result_df.to_string(index=False))
 
-    print("\n--- Summary Report ---")
-    print(summary)
+    print("\n=== NODE SUMMARY REPORT ===")
+    print(node_summary)
 
-    visualizer = FragilityVisualizer(result_df)
+    node_visualizer = FragilityVisualizer(
+        node_result_df,
+        label_column="node_name",
+        entity_name="Supply Chain Node"
+    )
 
-    fig1 = visualizer.plot_impact_score()
-    fig1.show()
+    node_impact_fig = node_visualizer.plot_impact_score(
+        title="Supply Chain Node Vulnerability (Impact Score)"
+    )
+    node_impact_fig.show()
 
-    fig2 = visualizer.plot_lead_time_increase(include_zero_delay=True)
-    fig2.show()
+    node_delay_fig = node_visualizer.plot_lead_time_increase(
+        title="Supply Chain Node Delay Impact",
+        include_zero_delay=False
+    )
+    node_delay_fig.show()
+
+    # -------------------------------
+    # EDGE BOTTLENECK ANALYSIS
+    # -------------------------------
+    edge_detector = EdgeBottleneckDetector(G)
+
+    edge_result_df = edge_detector.rank_edge_bottlenecks(
+        source_id=source_id,
+        target_id=target_id,
+        only_active_route_edges=False
+    )
+
+    edge_summary = edge_detector.summary_report(
+        source_id=source_id,
+        target_id=target_id,
+        only_active_route_edges=False
+    )
+
+    print("\n=== EDGE BOTTLENECK RANKING ===")
+    print(edge_result_df.to_string(index=False))
+
+    print("\n=== EDGE SUMMARY REPORT ===")
+    print(edge_summary)
+
+    edge_visualizer = FragilityVisualizer(
+        edge_result_df,
+        label_column="edge_id",
+        entity_name="Transport Link"
+    )
+
+    edge_impact_fig = edge_visualizer.plot_impact_score(
+        title="Transport Link Vulnerability (Impact Score)"
+    )
+    edge_impact_fig.show()
+
+    edge_delay_fig = edge_visualizer.plot_lead_time_increase(
+        title="Transport Link Delay Impact",
+        include_zero_delay=False
+    )
+    edge_delay_fig.show()
 
 
 if __name__ == "__main__":

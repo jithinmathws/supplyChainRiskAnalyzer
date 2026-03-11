@@ -4,19 +4,23 @@ import numpy as np
 
 
 class FragilityVisualizer:
-    def __init__(self, bottleneck_df):
+    def __init__(self, result_df, label_column, entity_name="Entity"):
         """
-        Initialize the visualizer with the DataFrame output
-        from BottleneckDetector.
+        result_df: DataFrame from node or edge bottleneck detector
+        label_column: column to use on x-axis
+            - "node_name" for node bottlenecks
+            - "edge_id" for edge bottlenecks
+        entity_name: display label for chart axis/title
         """
-        self.df = bottleneck_df.copy()
+        self.df = result_df.copy()
+        self.label_column = label_column
+        self.entity_name = entity_name
 
-    def plot_impact_score(self):
-        """
-        Create a bar chart ranking nodes by impact score.
-        Bars are colored by impact category.
-        """
-        color_map = {
+        if self.label_column not in self.df.columns:
+            raise ValueError(f"Label column '{self.label_column}' not found in DataFrame.")
+
+    def _color_map(self):
+        return {
             "Catastrophic": "#ef4444",
             "Severe Delay": "#f97316",
             "Moderate Delay": "#eab308",
@@ -24,23 +28,26 @@ class FragilityVisualizer:
             "Unknown": "#6b7280",
         }
 
+    def plot_impact_score(self, title=None):
+        """
+        Create a bar chart ranking entities by impact score.
+        """
         plot_df = self.df.sort_values("impact_score", ascending=False).copy()
 
         fig = px.bar(
             plot_df,
-            x="node_name",
+            x=self.label_column,
             y="impact_score",
             color="impact_category",
-            color_discrete_map=color_map,
-            title="Supply Chain Node Vulnerability (Impact Score)",
+            color_discrete_map=self._color_map(),
+            title=title or f"{self.entity_name} Vulnerability (Impact Score)",
             labels={
-                "node_name": "Supply Chain Node",
+                self.label_column: self.entity_name,
                 "impact_score": "Impact Score",
                 "impact_category": "Risk Level",
             },
             text_auto=".2f",
             hover_data={
-                "node_type": True,
                 "status": True,
                 "baseline_time": True,
                 "new_time": True,
@@ -56,41 +63,35 @@ class FragilityVisualizer:
 
         return fig
 
-    def plot_lead_time_increase(self, include_zero_delay=True):
+    def plot_lead_time_increase(self, title=None, include_zero_delay=True):
         """
-        Create a bar chart showing additional lead time caused by node failure.
-        Disconnected nodes are excluded because their delay is not finite.
+        Create a bar chart showing additional lead time caused by disruption.
+        Disconnected rows are excluded because delay is not finite.
         """
-        rerouted_df = self.df[self.df["status"] == "Rerouted"].copy()
+        plot_df = self.df[self.df["status"] == "Rerouted"].copy()
 
         if not include_zero_delay:
-            rerouted_df = rerouted_df[rerouted_df["lead_time_increase"] > 0]
+            plot_df = plot_df[plot_df["lead_time_increase"] > 0]
 
-        rerouted_df = rerouted_df.sort_values("lead_time_increase", ascending=False)
+        plot_df = plot_df.sort_values("lead_time_increase", ascending=False)
 
-        if rerouted_df.empty:
-            raise ValueError("No rerouted nodes available for lead time increase plotting.")
+        if plot_df.empty:
+            raise ValueError("No rerouted rows available for lead time plotting.")
 
         fig = px.bar(
-            rerouted_df,
-            x="node_name",
+            plot_df,
+            x=self.label_column,
             y="lead_time_increase",
             color="impact_category",
-            color_discrete_map={
-                "Catastrophic": "#ef4444",
-                "Severe Delay": "#f97316",
-                "Moderate Delay": "#eab308",
-                "Low Impact": "#22c55e",
-                "Unknown": "#6b7280",
-            },
-            title="Delay Impact: Additional Lead Time per Node Failure",
+            color_discrete_map=self._color_map(),
+            title=title or f"{self.entity_name} Delay Impact",
             labels={
-                "node_name": "Rerouted Node",
+                self.label_column: self.entity_name,
                 "lead_time_increase": "Additional Lead Time (Days)",
             },
             text_auto=".2f",
             hover_data={
-                "node_type": True,
+                "status": True,
                 "baseline_time": True,
                 "new_time": True,
                 "impact_score": ":.2f",
@@ -120,7 +121,11 @@ if __name__ == "__main__":
 
     mock_df = pd.DataFrame(data)
 
-    visualizer = FragilityVisualizer(mock_df)
+    visualizer = FragilityVisualizer(
+        mock_df,
+        label_column="node_name",
+        entity_name="Supply Chain Node"
+    )
 
     fig1 = visualizer.plot_impact_score()
     fig1.show()

@@ -218,13 +218,19 @@ simulations/
     cascading_failure.py
 
 analysis/
+    edge_bottleneck_detection.py
+    bottleneck_detection.py
     business_metrics_translator.py
+    scenario_analysis.py
 
 visualization/
     graph_plot.py
+    fragility_plots.py
+    scenario_plots.py
 
 app/
     streamlit_app.py
+    run_fragility_analysis.py
 
 notebooks/
     exploratory_analysis.ipynb
