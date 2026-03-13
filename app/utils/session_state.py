@@ -1,0 +1,27 @@
+import streamlit as st
+
+
+DEFAULT_SESSION_STATE = {
+    "analysis_ran": False,
+    "baseline_route_names": [],
+    "baseline_route_ids": [],
+    "baseline_time": None,
+    "node_result_df": None,
+    "edge_result_df": None,
+    "scenario_node_summary_df": None,
+    "scenario_edge_summary_df": None,
+    "scenario_overview": {},
+    "scenario_node_results_df": None,
+    "scenario_edge_results_df": None,
+}
+
+
+def initialize_session_state():
+    for key, value in DEFAULT_SESSION_STATE.items():
+        if key not in st.session_state:
+            st.session_state[key] = value
+
+
+def reset_analysis_state():
+    for key, value in DEFAULT_SESSION_STATE.items():
+        st.session_state[key] = value
