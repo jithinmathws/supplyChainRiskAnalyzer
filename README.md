@@ -211,6 +211,7 @@ data/
 core/
     graph_builder.py
     network_metrics.py
+    network_visualizer.py
 
 simulations/
     random_failure.py
@@ -305,7 +306,7 @@ pip install -r requirements.txt
 Run the graph construction module:
 
 ```
-python core/graph_builder.py
+python -m core.graph_builder
 ```
 
 This will:

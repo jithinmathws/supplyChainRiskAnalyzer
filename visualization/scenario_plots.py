@@ -12,6 +12,7 @@ class ScenarioVisualizer:
 
     def plot_catastrophic_count(self, title=None):
         plot_df = self.df.sort_values("catastrophic_count", ascending=False).copy()
+        plot_df = plot_df[plot_df["catastrophic_count"] > 0]
 
         fig = px.bar(
             plot_df,
@@ -33,6 +34,7 @@ class ScenarioVisualizer:
 
     def plot_average_impact(self, title=None):
         plot_df = self.df.sort_values("avg_impact_score", ascending=False).copy()
+        plot_df = plot_df[plot_df["avg_impact_score"] > 0]
 
         fig = px.bar(
             plot_df,
