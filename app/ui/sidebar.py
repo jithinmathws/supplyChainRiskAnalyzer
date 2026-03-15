@@ -56,7 +56,7 @@ def render_sidebar(node_options, labels):
         st.subheader("Overlay")
         network_overlay_mode = st.radio(
             "Network Overlay Mode",
-            options=["Baseline View", "Scenario View"],
+            options=["Baseline View", "Scenario View", "Cascade View"],
             index=0,
             help="Overlay either baseline bottleneck context or scenario-driven failures.",
         )

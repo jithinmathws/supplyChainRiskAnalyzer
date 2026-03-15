@@ -12,6 +12,11 @@ class CascadeSimulator:
     - Accumulate edge loads
     - Remove overloaded edges
     - Repeat until stable or max_steps reached
+
+    Flow Impact Tracking:
+    - Capture baseline path/cost/hops for each flow
+    - Compare final surviving path against baseline
+    - Mark each flow as delivered, rerouted, or disrupted
     """
 
     def __init__(
@@ -21,7 +26,9 @@ class CascadeSimulator:
         default_weight=1.0,
     ):
         if not G.is_directed():
-            raise ValueError("CascadeSimulator currently requires a directed graph (DiGraph).")
+            raise ValueError(
+                "CascadeSimulator currently requires a directed graph (DiGraph or MultiDiGraph)."
+            )
 
         self.original_graph = deepcopy(G)
         self.default_capacity = float(default_capacity)
@@ -37,9 +44,14 @@ class CascadeSimulator:
         """
         Ensure every edge has required attributes.
         """
-        for u, v, data in G.edges(data=True):
-            data.setdefault("capacity", self.default_capacity)
-            data.setdefault("weight", self.default_weight)
+        if G.is_multigraph():
+            for u, v, k, data in G.edges(keys=True, data=True):
+                data.setdefault("capacity", self.default_capacity)
+                data.setdefault("weight", self.default_weight)
+        else:
+            for u, v, data in G.edges(data=True):
+                data.setdefault("capacity", self.default_capacity)
+                data.setdefault("weight", self.default_weight)
 
     def reset(self):
         """
@@ -67,7 +79,10 @@ class CascadeSimulator:
         Parameters
         ----------
         disrupted_nodes : list[str]
-        disrupted_edges : list[tuple[str, str]]
+        disrupted_edges : list[tuple]
+            Supported formats:
+            - (u, v)
+            - (u, v, key) for MultiDiGraph
         flows : list[dict]
             Example:
             [
@@ -88,6 +103,8 @@ class CascadeSimulator:
 
         self._validate_flows(flows)
 
+        baseline_map = self._build_baseline_flow_map(flows)
+
         # Initial shock
         self.apply_initial_shock(disrupted_nodes, disrupted_edges)
 
@@ -100,12 +117,14 @@ class CascadeSimulator:
                 break
 
         metrics = self.compute_metrics(flows)
+        flow_impacts = self._build_flow_impact_table_data(flows, baseline_map)
 
         return {
             "timeline": self.timeline,
             "failed_nodes": sorted(self.failed_nodes),
             "failed_edges": sorted(self.failed_edges),
             "metrics": metrics,
+            "flow_impacts": flow_impacts,
         }
 
     # --------------------------------------------------
@@ -149,16 +168,40 @@ class CascadeSimulator:
     def apply_initial_shock(self, disrupted_nodes, disrupted_edges):
         """
         Remove initially disrupted nodes and directed edges.
+
+        For MultiDiGraph:
+        - (u, v, key) removes one specific parallel edge
+        - (u, v) removes all parallel edges between u and v
         """
         for n in disrupted_nodes:
             if self.G.has_node(n):
                 self.G.remove_node(n)
                 self.failed_nodes.add(n)
 
-        for u, v in disrupted_edges:
-            if self.G.has_edge(u, v):
-                self.G.remove_edge(u, v)
-                self.failed_edges.add((u, v))
+        for edge in disrupted_edges:
+            if self.G.is_multigraph():
+                if len(edge) == 3:
+                    u, v, k = edge
+                    if self.G.has_edge(u, v, key=k):
+                        self.G.remove_edge(u, v, key=k)
+                        self.failed_edges.add((u, v, k))
+                elif len(edge) == 2:
+                    u, v = edge
+                    if self.G.has_edge(u, v):
+                        keys = list(self.G[u][v].keys())
+                        for k in keys:
+                            if self.G.has_edge(u, v, key=k):
+                                self.G.remove_edge(u, v, key=k)
+                                self.failed_edges.add((u, v, k))
+                else:
+                    raise ValueError(f"Invalid disrupted edge format: {edge}")
+            else:
+                if len(edge) != 2:
+                    raise ValueError(f"Invalid disrupted edge format for DiGraph: {edge}")
+                u, v = edge
+                if self.G.has_edge(u, v):
+                    self.G.remove_edge(u, v)
+                    self.failed_edges.add((u, v))
 
     # --------------------------------------------------
     # Core step logic
@@ -178,7 +221,6 @@ class CascadeSimulator:
 
         routed_flows = []
         disrupted_flows = []
-        edge_loads_snapshot = {}
 
         for flow in flows:
             source = flow["source"]
@@ -220,15 +262,26 @@ class CascadeSimulator:
             )
 
         # Snapshot loads before removals
-        for u, v, data in self.G.edges(data=True):
-            load = data.get("load", 0.0)
-            capacity = data.get("capacity", self.default_capacity)
+        edge_loads_snapshot = {}
 
-            edge_loads_snapshot[(u, v)] = {
-                "load": load,
-                "capacity": capacity,
-                "utilization": load / capacity if capacity > 0 else None,
-            }
+        if self.G.is_multigraph():
+            for u, v, k, data in self.G.edges(keys=True, data=True):
+                load = data.get("load", 0.0)
+                capacity = data.get("capacity", self.default_capacity)
+                edge_loads_snapshot[(u, v, k)] = {
+                    "load": load,
+                    "capacity": capacity,
+                    "utilization": load / capacity if capacity > 0 else None,
+                }
+        else:
+            for u, v, data in self.G.edges(data=True):
+                load = data.get("load", 0.0)
+                capacity = data.get("capacity", self.default_capacity)
+                edge_loads_snapshot[(u, v)] = {
+                    "load": load,
+                    "capacity": capacity,
+                    "utilization": load / capacity if capacity > 0 else None,
+                }
 
         new_failed_edges = self._fail_overloaded_edges()
         new_failed_nodes = self._fail_isolated_nodes()
@@ -264,34 +317,59 @@ class CascadeSimulator:
     def _reset_edge_loads(self):
         """
         Set all current graph edge loads to zero before rerouting.
+        Supports both DiGraph and MultiDiGraph.
         """
-        for u, v in self.G.edges():
-            self.G[u][v]["load"] = 0.0
+        if self.G.is_multigraph():
+            for u, v, k in self.G.edges(keys=True):
+                self.G[u][v][k]["load"] = 0.0
+        else:
+            for u, v in self.G.edges():
+                self.G[u][v]["load"] = 0.0
 
     def _assign_flow_to_path(self, path, demand):
         """
         Assign flow demand along each edge in the selected shortest path.
+        For MultiDiGraph, approximate by assigning to the lowest-weight parallel edge.
         """
         for u, v in zip(path[:-1], path[1:]):
-            self.G[u][v]["load"] += demand
+            if self.G.is_multigraph():
+                best_key = min(
+                    self.G[u][v],
+                    key=lambda k: self.G[u][v][k].get("weight", self.default_weight),
+                )
+                self.G[u][v][best_key]["load"] += demand
+            else:
+                self.G[u][v]["load"] += demand
 
     def _fail_overloaded_edges(self):
         """
         Remove edges whose load exceeds capacity.
+        Supports both DiGraph and MultiDiGraph.
         """
         overloaded = []
 
-        for u, v, data in list(self.G.edges(data=True)):
-            load = float(data.get("load", 0.0))
-            capacity = float(data.get("capacity", self.default_capacity))
+        if self.G.is_multigraph():
+            for u, v, k, data in list(self.G.edges(keys=True, data=True)):
+                load = float(data.get("load", 0.0))
+                capacity = float(data.get("capacity", self.default_capacity))
+                if load > capacity:
+                    overloaded.append((u, v, k))
 
-            if load > capacity:
-                overloaded.append((u, v))
+            for u, v, k in overloaded:
+                if self.G.has_edge(u, v, key=k):
+                    self.G.remove_edge(u, v, key=k)
+                    self.failed_edges.add((u, v, k))
+        else:
+            for u, v, data in list(self.G.edges(data=True)):
+                load = float(data.get("load", 0.0))
+                capacity = float(data.get("capacity", self.default_capacity))
+                if load > capacity:
+                    overloaded.append((u, v))
 
-        for u, v in overloaded:
-            if self.G.has_edge(u, v):
-                self.G.remove_edge(u, v)
-                self.failed_edges.add((u, v))
+            for u, v in overloaded:
+                if self.G.has_edge(u, v):
+                    self.G.remove_edge(u, v)
+                    self.failed_edges.add((u, v))
 
         return overloaded
 
@@ -353,19 +431,13 @@ class CascadeSimulator:
             "failed_edge_count": len(self.failed_edges),
         }
 
+    # --------------------------------------------------
+    # Table helpers
+    # --------------------------------------------------
+
     def get_step_metrics_table(self, result):
         """
         Convert simulation timeline into a dataframe-friendly list of dicts.
-
-        Parameters
-        ----------
-        result : dict
-            Output returned by run_simulation()
-
-        Returns
-        -------
-        list[dict]
-            One flat record per simulation step.
         """
         rows = []
 
@@ -381,11 +453,196 @@ class CascadeSimulator:
                     "disrupted_demand": float(metrics.get("disrupted_demand", 0.0)),
                     "new_failed_edge_count": metrics.get("new_failed_edge_count", 0),
                     "new_failed_node_count": metrics.get("new_failed_node_count", 0),
-                    "cumulative_failed_edge_count": metrics.get("cumulative_failed_edge_count", 0),
-                    "cumulative_failed_node_count": metrics.get("cumulative_failed_node_count", 0),
+                    "cumulative_failed_edge_count": metrics.get(
+                        "cumulative_failed_edge_count", 0
+                    ),
+                    "cumulative_failed_node_count": metrics.get(
+                        "cumulative_failed_node_count", 0
+                    ),
                     "active_edge_count": metrics.get("active_edge_count", 0),
                     "active_node_count": metrics.get("active_node_count", 0),
                 }
             )
 
         return rows
+
+    def get_flow_impact_table(self, result):
+        """
+        Convert flow impact records into a dataframe-friendly list of dicts.
+        """
+        rows = []
+
+        for item in result.get("flow_impacts", []):
+            rows.append(
+                {
+                    "source": item.get("source"),
+                    "target": item.get("target"),
+                    "demand": float(item.get("demand", 0.0)),
+                    "status": item.get("status"),
+                    "rerouted": item.get("rerouted", False),
+                    "baseline_path": (
+                        " → ".join(map(str, item["baseline_path"]))
+                        if item.get("baseline_path")
+                        else None
+                    ),
+                    "final_path": (
+                        " → ".join(map(str, item["final_path"]))
+                        if item.get("final_path")
+                        else None
+                    ),
+                    "baseline_cost": item.get("baseline_cost"),
+                    "final_cost": item.get("final_cost"),
+                    "cost_increase": item.get("cost_increase"),
+                    "baseline_hops": item.get("baseline_hops"),
+                    "final_hops": item.get("final_hops"),
+                    "hop_increase": item.get("hop_increase"),
+                    "delivered_demand": float(item.get("delivered_demand", 0.0)),
+                    "unmet_demand": float(item.get("unmet_demand", 0.0)),
+                }
+            )
+
+        return rows
+
+    # --------------------------------------------------
+    # Flow impact helpers
+    # --------------------------------------------------
+
+    def _compute_path_cost(self, graph, path):
+        """
+        Compute total path cost using edge weight.
+        For MultiDiGraph, use the minimum-weight parallel edge between each node pair.
+        """
+        if not path or len(path) < 2:
+            return 0.0
+
+        total_cost = 0.0
+
+        for u, v in zip(path[:-1], path[1:]):
+            if graph.is_multigraph():
+                best_weight = min(
+                    graph[u][v][k].get("weight", self.default_weight)
+                    for k in graph[u][v]
+                )
+                total_cost += float(best_weight)
+            else:
+                total_cost += float(graph[u][v].get("weight", self.default_weight))
+
+        return total_cost
+
+    def _build_baseline_flow_map(self, flows):
+        """
+        Build baseline path/cost snapshot from the original graph.
+        """
+        baseline_map = {}
+
+        for flow in flows:
+            source = flow["source"]
+            target = flow["target"]
+            demand = float(flow["demand"])
+            flow_key = (source, target)
+
+            try:
+                baseline_path = nx.shortest_path(
+                    self.original_graph,
+                    source,
+                    target,
+                    weight="weight",
+                )
+                baseline_cost = self._compute_path_cost(self.original_graph, baseline_path)
+                baseline_hops = max(len(baseline_path) - 1, 0)
+
+                baseline_map[flow_key] = {
+                    "source": source,
+                    "target": target,
+                    "demand": demand,
+                    "baseline_path": baseline_path,
+                    "baseline_cost": baseline_cost,
+                    "baseline_hops": baseline_hops,
+                }
+            except (nx.NetworkXNoPath, nx.NodeNotFound):
+                baseline_map[flow_key] = {
+                    "source": source,
+                    "target": target,
+                    "demand": demand,
+                    "baseline_path": None,
+                    "baseline_cost": None,
+                    "baseline_hops": None,
+                }
+
+        return baseline_map
+
+    def _build_flow_impact_table_data(self, flows, baseline_map):
+        """
+        Build final flow impact records by comparing baseline and final network state.
+        """
+        records = []
+
+        for flow in flows:
+            source = flow["source"]
+            target = flow["target"]
+            demand = float(flow["demand"])
+            flow_key = (source, target)
+
+            baseline = baseline_map.get(flow_key, {})
+            baseline_path = baseline.get("baseline_path")
+            baseline_cost = baseline.get("baseline_cost")
+            baseline_hops = baseline.get("baseline_hops")
+
+            final_path = None
+            final_cost = None
+            final_hops = None
+            status = "disrupted"
+            rerouted = False
+            delivered_demand = 0.0
+
+            if self.G.has_node(source) and self.G.has_node(target):
+                try:
+                    final_path = nx.shortest_path(self.G, source, target, weight="weight")
+                    final_cost = self._compute_path_cost(self.G, final_path)
+                    final_hops = max(len(final_path) - 1, 0)
+                    delivered_demand = demand
+
+                    if baseline_path is None:
+                        status = "delivered"
+                    elif final_path == baseline_path:
+                        status = "delivered"
+                    else:
+                        status = "rerouted"
+                        rerouted = True
+
+                except (nx.NetworkXNoPath, nx.NodeNotFound):
+                    status = "disrupted"
+
+            cost_increase = (
+                final_cost - baseline_cost
+                if baseline_cost is not None and final_cost is not None
+                else None
+            )
+
+            hop_increase = (
+                final_hops - baseline_hops
+                if baseline_hops is not None and final_hops is not None
+                else None
+            )
+
+            records.append(
+                {
+                    "source": source,
+                    "target": target,
+                    "demand": demand,
+                    "status": status,
+                    "rerouted": rerouted,
+                    "baseline_path": baseline_path,
+                    "final_path": final_path,
+                    "baseline_cost": baseline_cost,
+                    "final_cost": final_cost,
+                    "cost_increase": cost_increase,
+                    "baseline_hops": baseline_hops,
+                    "final_hops": final_hops,
+                    "hop_increase": hop_increase,
+                    "delivered_demand": delivered_demand,
+                    "unmet_demand": demand - delivered_demand,
+                }
+            )
+
+        return records

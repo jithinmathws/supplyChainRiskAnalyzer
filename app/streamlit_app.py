@@ -14,6 +14,7 @@ from ui.bottleneck_view import (
 from ui.graph_view import render_graph_tab
 from ui.scenario_view import render_scenario_analysis_tab, render_scenario_builder
 from ui.sidebar import render_sidebar
+from ui.cascade_view import render_cascade_analysis_tab, render_cascade_builder
 from utils.session_state import initialize_session_state, reset_analysis_state
 
 
@@ -88,20 +89,14 @@ if st.session_state.analysis_ran:
         edge_result_df=edge_result_df,
     )
 
-    scenario_data = render_scenario_builder(
-        graph=graph,
-        graph_signature=graph_signature,
-        node_options=node_options,
-    )
-
-    st.session_state.scenario_node_results_df = scenario_data["node_scenario_results_df"]
-    st.session_state.scenario_edge_results_df = scenario_data["edge_scenario_results_df"]
-    st.session_state.scenario_node_summary_df = scenario_data["node_scenario_summary_df"]
-    st.session_state.scenario_edge_summary_df = scenario_data["edge_scenario_summary_df"]
-    st.session_state.scenario_overview = scenario_data["scenario_overview"]
-
-    tab1, tab2, tab3, tab4 = st.tabs(
-        ["Node Analysis", "Edge Analysis", "Scenario Analysis", "Network Visualization"]
+    tab1, tab2, tab3, tab4, tab5 = st.tabs(
+        [
+            "Node Analysis",
+            "Edge Analysis",
+            "Scenario Analysis",
+            "Cascade Simulation",
+            "Network Visualization",
+        ]
     )
 
     with tab1:
@@ -111,14 +106,51 @@ if st.session_state.analysis_ran:
         render_edge_analysis_tab(edge_result_df)
 
     with tab3:
+        # Move the builder inside the tab to clean up the UI
+        scenario_data = render_scenario_builder(
+            graph=graph,
+            graph_signature=graph_signature,
+            node_options=node_options,
+        )
+
+        st.session_state.scenario_node_results_df = scenario_data["node_scenario_results_df"]
+        st.session_state.scenario_edge_results_df = scenario_data["edge_scenario_results_df"]
+        st.session_state.scenario_node_summary_df = scenario_data["node_scenario_summary_df"]
+        st.session_state.scenario_edge_summary_df = scenario_data["edge_scenario_summary_df"]
+        st.session_state.scenario_overview = scenario_data["scenario_overview"]
+        st.session_state.selected_scenario_flows = scenario_data["selected_flows"]
+        
         render_scenario_analysis_tab(
-            selected_flows=scenario_data["selected_flows"],
-            node_scenario_summary_df=scenario_data["node_scenario_summary_df"],
-            edge_scenario_summary_df=scenario_data["edge_scenario_summary_df"],
-            scenario_overview=scenario_data["scenario_overview"],
+            selected_flows=st.session_state.selected_scenario_flows,
+            node_scenario_summary_df=st.session_state.scenario_node_summary_df,
+            edge_scenario_summary_df=st.session_state.scenario_edge_summary_df,
+            scenario_overview=st.session_state.scenario_overview,
         )
 
     with tab4:
+        # Move the builder inside the tab
+        cascade_data = render_cascade_builder(
+            graph=graph,
+            graph_signature=graph_signature,
+            node_options=node_options,
+        )
+
+        # STATE GUARD: Only update session state if the simulation was actually run!
+        # This prevents the results from disappearing when you click other tabs.
+        if cascade_data["cascade_result"] is not None:
+            st.session_state.cascade_result = cascade_data["cascade_result"]
+            st.session_state.cascade_step_metrics_df = cascade_data["step_metrics_df"]
+            st.session_state.cascade_overview = cascade_data["cascade_overview"]
+            st.session_state.cascade_flow_impact_df = cascade_data["flow_impact_df"]
+
+        render_cascade_analysis_tab(
+            cascade_result=st.session_state.cascade_result,
+            step_metrics_df=st.session_state.cascade_step_metrics_df,
+            cascade_overview=st.session_state.cascade_overview,
+            flow_impact_df=st.session_state.cascade_flow_impact_df,
+        )
+
+    with tab5:
         render_graph_tab(
             graph=graph,
             node_result_df=node_result_df,

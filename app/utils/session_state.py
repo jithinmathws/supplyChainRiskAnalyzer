@@ -13,15 +13,20 @@ DEFAULT_SESSION_STATE = {
     "scenario_overview": {},
     "scenario_node_results_df": None,
     "scenario_edge_results_df": None,
+    "selected_scenario_flows": [],
+    "cascade_result": None,
+    "cascade_step_metrics_df": None,
+    "cascade_overview": {},
+    "cascade_flow_impact_df": None,
 }
 
 
 def initialize_session_state():
     for key, value in DEFAULT_SESSION_STATE.items():
         if key not in st.session_state:
-            st.session_state[key] = value
+            st.session_state[key] = value.copy() if isinstance(value, (dict, list)) else value
 
 
 def reset_analysis_state():
     for key, value in DEFAULT_SESSION_STATE.items():
-        st.session_state[key] = value
+        st.session_state[key] = value.copy() if isinstance(value, (dict, list)) else value
