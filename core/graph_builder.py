@@ -1,5 +1,5 @@
-import pandas as pd
 import networkx as nx
+import pandas as pd
 
 
 class SupplyChainGraph:
@@ -65,9 +65,7 @@ class SupplyChainGraph:
             target = edge.pop("target")
 
             if source not in node_ids or target not in node_ids:
-                raise ValueError(
-                    f"Edge references undefined node: source={source}, target={target}"
-                )
+                raise ValueError(f"Edge references undefined node: source={source}, target={target}")
 
             edge_key = edge.get("transport_mode", "default")
             self.graph.add_edge(source, target, key=edge_key, **edge)

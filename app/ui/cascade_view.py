@@ -1,7 +1,6 @@
 import streamlit as st
-
-from services.graph_service import get_available_scenario_flows, get_default_scenario_flows
 from services.cascade_service import build_cascade_overview, run_cascade_analysis_cached
+from services.graph_service import get_available_scenario_flows, get_default_scenario_flows
 
 
 def normalize_edge_tuple(edge):
@@ -66,11 +65,7 @@ def render_cascade_builder(graph, graph_signature, node_options):
             key="cascade_flow_selection",
         )
 
-        selected_flows = [
-            item["flow"]
-            for item in available_flows
-            if item["label"] in selected_flow_labels
-        ]
+        selected_flows = [item["flow"] for item in available_flows if item["label"] in selected_flow_labels]
 
         if selected_flow_labels:
             st.write("Selected cascade flows:")

@@ -2,7 +2,7 @@ import networkx as nx
 
 from analysis.bottleneck_detection import BottleneckDetector
 from analysis.edge_bottleneck_detection import EdgeBottleneckDetector
-from services.graph_service import get_baseline_route
+from app.services.graph_service import get_baseline_route
 
 
 def run_baseline_analysis(graph, origin_id, destination_id):

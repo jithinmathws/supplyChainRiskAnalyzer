@@ -3,7 +3,7 @@ from __future__ import annotations
 import math
 import tempfile
 from pathlib import Path
-from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
+from typing import Any, Dict, Iterable, Optional, Set, Tuple
 
 import networkx as nx
 from pyvis.network import Network

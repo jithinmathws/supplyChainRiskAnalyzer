@@ -1,6 +1,6 @@
-import plotly.express as px
-import pandas as pd
 import numpy as np
+import pandas as pd
+import plotly.express as px
 
 
 class FragilityVisualizer:
@@ -121,11 +121,7 @@ if __name__ == "__main__":
 
     mock_df = pd.DataFrame(data)
 
-    visualizer = FragilityVisualizer(
-        mock_df,
-        label_column="node_name",
-        entity_name="Supply Chain Node"
-    )
+    visualizer = FragilityVisualizer(mock_df, label_column="node_name", entity_name="Supply Chain Node")
 
     fig1 = visualizer.plot_impact_score()
     fig1.show()

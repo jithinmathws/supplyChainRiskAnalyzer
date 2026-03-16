@@ -1,5 +1,4 @@
 import streamlit as st
-
 from services.analysis_service import run_baseline_analysis
 from services.graph_service import (
     get_graph_signature,
@@ -11,12 +10,11 @@ from ui.bottleneck_view import (
     render_executive_summary,
     render_node_analysis_tab,
 )
+from ui.cascade_view import render_cascade_analysis_tab, render_cascade_builder
 from ui.graph_view import render_graph_tab
 from ui.scenario_view import render_scenario_analysis_tab, render_scenario_builder
 from ui.sidebar import render_sidebar
-from ui.cascade_view import render_cascade_analysis_tab, render_cascade_builder
 from utils.session_state import initialize_session_state, reset_analysis_state
-
 
 st.set_page_config(page_title="Supply Chain Fragility Analyzer", layout="wide")
 st.title("Supply Chain Fragility & Risk Analyzer")
@@ -119,7 +117,7 @@ if st.session_state.analysis_ran:
         st.session_state.scenario_edge_summary_df = scenario_data["edge_scenario_summary_df"]
         st.session_state.scenario_overview = scenario_data["scenario_overview"]
         st.session_state.selected_scenario_flows = scenario_data["selected_flows"]
-        
+
         render_scenario_analysis_tab(
             selected_flows=st.session_state.selected_scenario_flows,
             node_scenario_summary_df=st.session_state.scenario_node_summary_df,

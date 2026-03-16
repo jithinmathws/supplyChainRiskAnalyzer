@@ -1,5 +1,6 @@
-import networkx as nx
 from copy import deepcopy
+
+import networkx as nx
 
 
 class CascadeSimulator:
@@ -453,12 +454,8 @@ class CascadeSimulator:
                     "disrupted_demand": float(metrics.get("disrupted_demand", 0.0)),
                     "new_failed_edge_count": metrics.get("new_failed_edge_count", 0),
                     "new_failed_node_count": metrics.get("new_failed_node_count", 0),
-                    "cumulative_failed_edge_count": metrics.get(
-                        "cumulative_failed_edge_count", 0
-                    ),
-                    "cumulative_failed_node_count": metrics.get(
-                        "cumulative_failed_node_count", 0
-                    ),
+                    "cumulative_failed_edge_count": metrics.get("cumulative_failed_edge_count", 0),
+                    "cumulative_failed_node_count": metrics.get("cumulative_failed_node_count", 0),
                     "active_edge_count": metrics.get("active_edge_count", 0),
                     "active_node_count": metrics.get("active_node_count", 0),
                 }
@@ -481,14 +478,10 @@ class CascadeSimulator:
                     "status": item.get("status"),
                     "rerouted": item.get("rerouted", False),
                     "baseline_path": (
-                        " → ".join(map(str, item["baseline_path"]))
-                        if item.get("baseline_path")
-                        else None
+                        " → ".join(map(str, item["baseline_path"])) if item.get("baseline_path") else None
                     ),
                     "final_path": (
-                        " → ".join(map(str, item["final_path"]))
-                        if item.get("final_path")
-                        else None
+                        " → ".join(map(str, item["final_path"])) if item.get("final_path") else None
                     ),
                     "baseline_cost": item.get("baseline_cost"),
                     "final_cost": item.get("final_cost"),
@@ -519,10 +512,7 @@ class CascadeSimulator:
 
         for u, v in zip(path[:-1], path[1:]):
             if graph.is_multigraph():
-                best_weight = min(
-                    graph[u][v][k].get("weight", self.default_weight)
-                    for k in graph[u][v]
-                )
+                best_weight = min(graph[u][v][k].get("weight", self.default_weight) for k in graph[u][v])
                 total_cost += float(best_weight)
             else:
                 total_cost += float(graph[u][v].get("weight", self.default_weight))
@@ -614,15 +604,11 @@ class CascadeSimulator:
                     status = "disrupted"
 
             cost_increase = (
-                final_cost - baseline_cost
-                if baseline_cost is not None and final_cost is not None
-                else None
+                final_cost - baseline_cost if baseline_cost is not None and final_cost is not None else None
             )
 
             hop_increase = (
-                final_hops - baseline_hops
-                if baseline_hops is not None and final_hops is not None
-                else None
+                final_hops - baseline_hops if baseline_hops is not None and final_hops is not None else None
             )
 
             records.append(

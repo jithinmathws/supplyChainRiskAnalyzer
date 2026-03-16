@@ -1,7 +1,7 @@
 import streamlit as st
-
 from services.graph_service import get_available_scenario_flows, get_default_scenario_flows
 from services.scenario_service import run_scenario_analysis_cached
+
 from visualization.scenario_plots import ScenarioVisualizer
 
 
@@ -33,11 +33,7 @@ def render_scenario_builder(graph, graph_signature, node_options):
             key="scenario_flow_selection",
         )
 
-        selected_flows = [
-            item["flow"]
-            for item in available_flows
-            if item["label"] in selected_flow_labels
-        ]
+        selected_flows = [item["flow"] for item in available_flows if item["label"] in selected_flow_labels]
 
         if selected_flow_labels:
             st.write("Selected flows:")
@@ -72,7 +68,12 @@ def render_scenario_builder(graph, graph_signature, node_options):
     }
 
 
-def render_scenario_analysis_tab(selected_flows, node_scenario_summary_df, edge_scenario_summary_df, scenario_overview):
+def render_scenario_analysis_tab(
+    selected_flows,
+    node_scenario_summary_df,
+    edge_scenario_summary_df,
+    scenario_overview,
+):
     st.subheader("Scenario Analysis")
     st.write("Compare recurring fragility patterns across multiple source-destination flows.")
 
@@ -127,17 +128,13 @@ def render_scenario_analysis_tab(selected_flows, node_scenario_summary_df, edge_
 
             with node_chart_col1:
                 st.plotly_chart(
-                    node_scenario_visualizer.plot_catastrophic_count(
-                        title="Node Catastrophic Failure Count"
-                    ),
+                    node_scenario_visualizer.plot_catastrophic_count(title="Node Catastrophic Failure Count"),
                     use_container_width=True,
                 )
 
             with node_chart_col2:
                 st.plotly_chart(
-                    node_scenario_visualizer.plot_average_impact(
-                        title="Node Average Impact Score"
-                    ),
+                    node_scenario_visualizer.plot_average_impact(title="Node Average Impact Score"),
                     use_container_width=True,
                 )
 
@@ -147,17 +144,13 @@ def render_scenario_analysis_tab(selected_flows, node_scenario_summary_df, edge_
 
             with edge_chart_col1:
                 st.plotly_chart(
-                    edge_scenario_visualizer.plot_catastrophic_count(
-                        title="Edge Catastrophic Failure Count"
-                    ),
+                    edge_scenario_visualizer.plot_catastrophic_count(title="Edge Catastrophic Failure Count"),
                     use_container_width=True,
                 )
 
             with edge_chart_col2:
                 st.plotly_chart(
-                    edge_scenario_visualizer.plot_average_impact(
-                        title="Edge Average Impact Score"
-                    ),
+                    edge_scenario_visualizer.plot_average_impact(title="Edge Average Impact Score"),
                     use_container_width=True,
                 )
     else:

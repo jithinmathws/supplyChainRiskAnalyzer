@@ -1,6 +1,5 @@
 import streamlit as st
 
-
 DEFAULT_SESSION_STATE = {
     "analysis_ran": False,
     "baseline_route_names": [],

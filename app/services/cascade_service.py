@@ -3,6 +3,7 @@ import streamlit as st
 
 from analysis.cascade_simulator import CascadeSimulator
 
+
 def _normalize_flows(selected_flows, default_demand=40.0):
     normalized = []
     for origin_id, destination_id in selected_flows:
@@ -14,6 +15,7 @@ def _normalize_flows(selected_flows, default_demand=40.0):
             }
         )
     return normalized
+
 
 def _normalize_disrupted_edges(disrupted_edges):
     normalized = []
@@ -27,6 +29,7 @@ def _normalize_disrupted_edges(disrupted_edges):
         else:
             raise ValueError(f"Invalid disrupted edge format: {edge}")
     return normalized
+
 
 @st.cache_data(show_spinner=False)
 def run_cascade_analysis_cached(
@@ -71,9 +74,10 @@ def run_cascade_analysis_cached(
 
     return result, step_metrics_df, flow_impact_df
 
+
 def build_cascade_overview(result, step_metrics_df):
     metrics = result.get("metrics", {})
-    
+
     # Calculate collapse step directly from the dataframe
     collapse_step = None
     if not step_metrics_df.empty:

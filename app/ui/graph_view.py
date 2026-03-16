@@ -1,8 +1,8 @@
 import streamlit as st
 import streamlit.components.v1 as components
+from services.graph_service import enrich_graph_for_visualization
 
 from core.network_visualizer import NetworkVisualizer
-from services.graph_service import enrich_graph_for_visualization
 
 
 def format_edge_tuple(edge):
@@ -198,9 +198,7 @@ def render_graph_tab(graph, node_result_df, controls):
             st.warning("⚠️ No cascade overlay data available.")
         else:
             failed_nodes = [str(x) for x in cascade_result.get("failed_nodes", [])]
-            failed_edges = normalize_edges_for_visualization(
-                cascade_result.get("failed_edges", [])
-            )
+            failed_edges = normalize_edges_for_visualization(cascade_result.get("failed_edges", []))
             rerouted_edges = normalize_edges_for_visualization(
                 extract_rerouted_edges_from_flow_impact(cascade_flow_impact_df)
             )
@@ -213,8 +211,7 @@ def render_graph_tab(graph, node_result_df, controls):
 
     route_node_ids = [str(x) for x in st.session_state.get("baseline_route_ids", [])]
     highlighted_edges = [
-        (str(route_node_ids[i]), str(route_node_ids[i + 1]))
-        for i in range(len(route_node_ids) - 1)
+        (str(route_node_ids[i]), str(route_node_ids[i + 1])) for i in range(len(route_node_ids) - 1)
     ]
 
     if overlay_mode == "Cascade View":
@@ -262,10 +259,7 @@ def render_graph_tab(graph, node_result_df, controls):
     with detail_col1:
         st.write("**Highlighted Baseline Route Nodes**")
         if route_node_ids:
-            route_names = [
-                graph.nodes[n].get("name", n) if n in graph.nodes else n
-                for n in route_node_ids
-            ]
+            route_names = [graph.nodes[n].get("name", n) if n in graph.nodes else n for n in route_node_ids]
             st.success(" → ".join(map(str, route_names)))
         else:
             st.info("No baseline route highlight available.")
