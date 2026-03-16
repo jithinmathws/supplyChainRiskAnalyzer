@@ -1,4 +1,5 @@
 import networkx as nx
+import pandas as pd
 import pytest
 
 from app.services.analysis_service import run_baseline_analysis
@@ -29,15 +30,27 @@ def test_run_baseline_analysis_returns_expected_keys():
 
 
 def test_run_baseline_analysis_raises_for_no_path():
-    """
-    This is a more valuable test than same-origin testing.
+    graph = nx.MultiDiGraph()
+    graph.add_node("A", name="A", type="supplier", location="Loc A", capacity=100)
+    graph.add_node("B", name="B", type="customer", location="Loc B", capacity=100)
 
-    We construct a disconnected graph and verify
-    the service raises for no available route.
-    """
-    graph = nx.DiGraph()
-    graph.add_node("A", name="A")
-    graph.add_node("B", name="B")
-
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="No valid baseline route exists"):
         run_baseline_analysis(graph, "A", "B")
+
+
+def test_baseline_route_uses_expected_path(small_supply_chain_graph, monkeypatch):
+    def fake_get_baseline_route(graph, origin_id, destination_id):
+        return ["A", "B", "D"], ["Supplier A", "Hub B", "Customer D"], 2
+
+    monkeypatch.setattr(
+        "app.services.analysis_service.get_baseline_route",
+        fake_get_baseline_route,
+    )
+
+    result = run_baseline_analysis(small_supply_chain_graph, "A", "D")
+
+    assert result["baseline_route_ids"] == ["A", "B", "D"]
+    assert result["baseline_route_names"] == ["Supplier A", "Hub B", "Customer D"]
+    assert result["baseline_time"] == 2
+    assert isinstance(result["node_result_df"], pd.DataFrame)
+    assert isinstance(result["edge_result_df"], pd.DataFrame)
