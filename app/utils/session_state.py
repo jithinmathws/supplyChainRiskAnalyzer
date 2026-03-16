@@ -17,6 +17,7 @@ DEFAULT_SESSION_STATE = {
     "cascade_step_metrics_df": None,
     "cascade_overview": {},
     "cascade_flow_impact_df": None,
+    "cascade_insight": "",
 }
 
 

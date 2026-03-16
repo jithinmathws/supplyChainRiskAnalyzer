@@ -1,5 +1,9 @@
 import streamlit as st
-from services.cascade_service import build_cascade_overview, run_cascade_analysis_cached
+from services.cascade_service import (
+    build_cascade_insight,
+    build_cascade_overview,
+    run_cascade_analysis_cached,
+)
 from services.graph_service import get_available_scenario_flows, get_default_scenario_flows
 
 
@@ -53,10 +57,7 @@ def render_cascade_builder(graph, graph_signature, node_options):
 
     if builder_mode == "Default Flows":
         selected_flows = get_default_scenario_flows()
-        st.info(
-            "Default cascade set uses predefined origin-destination flows. "
-            "You can switch to Custom Flows for manual selection."
-        )
+        st.info("Default cascade set uses predefined origin-destination flows. " "You can switch to Custom Flows for manual selection.")
     else:
         selected_flow_labels = st.multiselect(
             "Select one or more cascade flows",
@@ -150,6 +151,7 @@ def render_cascade_builder(graph, graph_signature, node_options):
     step_metrics_df = None
     flow_impact_df = None
     cascade_overview = {}
+    cascade_insight = ""
 
     if run_cascade:
         if not selected_flows:
@@ -172,6 +174,11 @@ def render_cascade_builder(graph, graph_signature, node_options):
             )
 
             cascade_overview = build_cascade_overview(cascade_result, step_metrics_df)
+            cascade_insight = build_cascade_insight(
+                cascade_result,
+                flow_impact_df,
+                step_metrics_df,
+            )
 
     return {
         "selected_flows": selected_flows,
@@ -181,10 +188,17 @@ def render_cascade_builder(graph, graph_signature, node_options):
         "step_metrics_df": step_metrics_df,
         "flow_impact_df": flow_impact_df,
         "cascade_overview": cascade_overview,
+        "cascade_insight": cascade_insight,
     }
 
 
-def render_cascade_analysis_tab(cascade_result, step_metrics_df, cascade_overview, flow_impact_df):
+def render_cascade_analysis_tab(
+    cascade_result,
+    step_metrics_df,
+    cascade_overview,
+    flow_impact_df,
+    cascade_insight,
+):
     st.subheader("Cascade Simulation")
     st.write("Simulate rerouting, overload propagation, and cascading failures across the network.")
 
@@ -201,6 +215,10 @@ def render_cascade_analysis_tab(cascade_result, step_metrics_df, cascade_overvie
     metric_col5.metric("Failed Nodes", cascade_overview.get("failed_node_count", 0))
     metric_col6.metric("Failed Edges", cascade_overview.get("failed_edge_count", 0))
 
+    if cascade_insight:
+        st.markdown("### Insight")
+        st.info(cascade_insight)
+
     collapse_step = cascade_overview.get("collapse_step")
     if collapse_step is not None:
         st.warning(f"Network demand fully collapsed by step {collapse_step}.")
@@ -210,23 +228,34 @@ def render_cascade_analysis_tab(cascade_result, step_metrics_df, cascade_overvie
     st.markdown("### Step Metrics Table")
     st.dataframe(step_metrics_df, use_container_width=True)
 
+    if step_metrics_df is not None and not step_metrics_df.empty:
+        st.download_button(
+            label="📥 Download Step Metrics (CSV)",
+            data=step_metrics_df.to_csv(index=False),
+            file_name="cascade_step_metrics.csv",
+            mime="text/csv",
+        )
+
     st.markdown("### Demand Progression")
     demand_cols = [c for c in ["routed_demand", "disrupted_demand"] if c in step_metrics_df.columns]
     if demand_cols:
         st.line_chart(step_metrics_df.set_index("step")[demand_cols], use_container_width=True)
 
     st.markdown("### Failure Progression")
-    failure_cols = [
-        c
-        for c in ["cumulative_failed_edge_count", "cumulative_failed_node_count"]
-        if c in step_metrics_df.columns
-    ]
+    failure_cols = [c for c in ["cumulative_failed_edge_count", "cumulative_failed_node_count"] if c in step_metrics_df.columns]
     if failure_cols:
         st.line_chart(step_metrics_df.set_index("step")[failure_cols], use_container_width=True)
 
     st.markdown("### Flow Impact Table")
     if flow_impact_df is not None and not flow_impact_df.empty:
         st.dataframe(flow_impact_df, use_container_width=True)
+
+        st.download_button(
+            label="📥 Download Flow Impact Results (CSV)",
+            data=flow_impact_df.to_csv(index=False),
+            file_name="cascade_flow_impacts.csv",
+            mime="text/csv",
+        )
     else:
         st.info("No flow impact data available.")
 

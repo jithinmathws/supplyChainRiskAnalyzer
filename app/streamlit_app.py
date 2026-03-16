@@ -104,7 +104,6 @@ if st.session_state.analysis_ran:
         render_edge_analysis_tab(edge_result_df)
 
     with tab3:
-        # Move the builder inside the tab to clean up the UI
         scenario_data = render_scenario_builder(
             graph=graph,
             graph_signature=graph_signature,
@@ -126,26 +125,26 @@ if st.session_state.analysis_ran:
         )
 
     with tab4:
-        # Move the builder inside the tab
         cascade_data = render_cascade_builder(
             graph=graph,
             graph_signature=graph_signature,
             node_options=node_options,
         )
 
-        # STATE GUARD: Only update session state if the simulation was actually run!
-        # This prevents the results from disappearing when you click other tabs.
+        # Only update session state if a cascade simulation was actually run
         if cascade_data["cascade_result"] is not None:
             st.session_state.cascade_result = cascade_data["cascade_result"]
             st.session_state.cascade_step_metrics_df = cascade_data["step_metrics_df"]
             st.session_state.cascade_overview = cascade_data["cascade_overview"]
             st.session_state.cascade_flow_impact_df = cascade_data["flow_impact_df"]
+            st.session_state.cascade_insight = cascade_data["cascade_insight"]
 
         render_cascade_analysis_tab(
             cascade_result=st.session_state.cascade_result,
             step_metrics_df=st.session_state.cascade_step_metrics_df,
             cascade_overview=st.session_state.cascade_overview,
             flow_impact_df=st.session_state.cascade_flow_impact_df,
+            cascade_insight=st.session_state.cascade_insight,
         )
 
     with tab5:

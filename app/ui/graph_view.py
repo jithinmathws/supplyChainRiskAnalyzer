@@ -29,10 +29,6 @@ def normalize_edges_for_visualization(edges):
     Supports:
     - (u, v)
     - (u, v, key) -> (u, v)
-
-    Returns
-    -------
-    list[tuple[str, str]]
     """
     normalized = []
     seen = set()
@@ -151,7 +147,6 @@ def extract_rerouted_edges_from_flow_impact(flow_impact_df):
             for i in range(len(nodes) - 1):
                 edges.append((nodes[i], nodes[i + 1]))
 
-    # deduplicate while preserving order
     seen = set()
     unique_edges = []
     for edge in edges:
@@ -160,6 +155,44 @@ def extract_rerouted_edges_from_flow_impact(flow_impact_df):
             unique_edges.append(edge)
 
     return unique_edges
+
+
+def render_overlay_interpretation(overlay_mode, failed_nodes, failed_edges, rerouted_edges):
+    st.markdown("### How to Interpret This View")
+
+    if overlay_mode == "Baseline View":
+        st.info(
+            "Baseline View highlights the normal route structure and top bottleneck nodes. "
+            "Use it to understand which components matter most before disruptions are applied."
+        )
+    elif overlay_mode == "Scenario View":
+        st.info(
+            "Scenario View highlights the highest-impact nodes and edges from scenario analysis. "
+            "These overlays represent scenario-driven fragility, not dynamic cascade progression."
+        )
+    elif overlay_mode == "Cascade View":
+        summary_parts = []
+        summary_parts.append(f"Failed nodes: {len(failed_nodes)}")
+        summary_parts.append(f"Failed edges: {len(failed_edges)}")
+        summary_parts.append(f"Rerouted edge segments: {len(rerouted_edges)}")
+
+        st.info("Cascade View shows final post-cascade failures and surviving reroutes. " + " | ".join(summary_parts))
+
+
+def render_visual_legend():
+    st.markdown("### Visual Legend")
+
+    legend_col1, legend_col2 = st.columns(2)
+
+    with legend_col1:
+        st.write("🔴 **Red node** — failed / disrupted node")
+        st.write("🔴 **Red dashed edge** — failed / disrupted edge")
+        st.write("🟢 **Highlighted route** — baseline route")
+
+    with legend_col2:
+        st.write("🟠 **Highlighted reroute edge** — rerouted surviving flow")
+        st.write("⭐ **Bottleneck node** — top-ranked critical node")
+        st.write("↗️ **Arrow direction** — flow direction in the supply chain network")
 
 
 def render_graph_tab(graph, node_result_df, controls):
@@ -199,9 +232,7 @@ def render_graph_tab(graph, node_result_df, controls):
         else:
             failed_nodes = [str(x) for x in cascade_result.get("failed_nodes", [])]
             failed_edges = normalize_edges_for_visualization(cascade_result.get("failed_edges", []))
-            rerouted_edges = normalize_edges_for_visualization(
-                extract_rerouted_edges_from_flow_impact(cascade_flow_impact_df)
-            )
+            rerouted_edges = normalize_edges_for_visualization(extract_rerouted_edges_from_flow_impact(cascade_flow_impact_df))
 
     graph_viz = enrich_graph_for_visualization(
         graph,
@@ -210,14 +241,14 @@ def render_graph_tab(graph, node_result_df, controls):
     )
 
     route_node_ids = [str(x) for x in st.session_state.get("baseline_route_ids", [])]
-    highlighted_edges = [
-        (str(route_node_ids[i]), str(route_node_ids[i + 1])) for i in range(len(route_node_ids) - 1)
-    ]
+    highlighted_edges = [(str(route_node_ids[i]), str(route_node_ids[i + 1])) for i in range(len(route_node_ids) - 1)]
 
+    # In cascade view, only show rerouted edges as active route overlays
     if overlay_mode == "Cascade View":
         combined_highlighted_edges = rerouted_edges
     else:
         combined_highlighted_edges = highlighted_edges
+
     combined_highlighted_edges = normalize_edges_for_visualization(combined_highlighted_edges)
 
     st.markdown("### Visualization Settings Summary")
@@ -226,6 +257,14 @@ def render_graph_tab(graph, node_result_df, controls):
     info_col2.info(f"Node Size: {controls['node_size_by'] or 'fixed'}")
     info_col3.info(f"Node Color: {controls['node_color_by']}")
     info_col4.info(f"Edge Width: {controls['edge_width_by'] or 'fixed'}")
+
+    render_overlay_interpretation(
+        overlay_mode=overlay_mode,
+        failed_nodes=failed_nodes,
+        failed_edges=failed_edges,
+        rerouted_edges=rerouted_edges,
+    )
+    render_visual_legend()
 
     visualizer = NetworkVisualizer(height="760px", width="100%")
 

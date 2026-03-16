@@ -66,10 +66,7 @@ def run_cascade_analysis_cached(
         max_steps=int(max_steps),
     )
 
-    # Step metrics dataframe
     step_metrics_df = pd.DataFrame(simulator.get_step_metrics_table(result))
-
-    # ✅ NEW — Flow impact dataframe
     flow_impact_df = pd.DataFrame(simulator.get_flow_impact_table(result))
 
     return result, step_metrics_df, flow_impact_df
@@ -78,7 +75,6 @@ def run_cascade_analysis_cached(
 def build_cascade_overview(result, step_metrics_df):
     metrics = result.get("metrics", {})
 
-    # Calculate collapse step directly from the dataframe
     collapse_step = None
     if not step_metrics_df.empty:
         collapsed_rows = step_metrics_df[step_metrics_df["routed_demand"] == 0]
@@ -94,3 +90,63 @@ def build_cascade_overview(result, step_metrics_df):
         "failed_edge_count": metrics.get("failed_edge_count", 0),
         "collapse_step": int(collapse_step) if collapse_step is not None else None,
     }
+
+
+def build_cascade_insight(result, flow_impact_df, step_metrics_df):
+    """
+    Build a compact human-readable insight summary for cascade results.
+    """
+    metrics = result.get("metrics", {})
+
+    total_flows = int(metrics.get("total_flows", 0))
+    disrupted_flows = int(metrics.get("disrupted_flows", 0))
+    failed_nodes = int(metrics.get("failed_node_count", 0))
+    failed_edges = int(metrics.get("failed_edge_count", 0))
+    service_level = float(metrics.get("service_level", 0.0))
+
+    rerouted_count = 0
+    delivered_count = 0
+
+    if flow_impact_df is not None and not flow_impact_df.empty and "status" in flow_impact_df.columns:
+        rerouted_count = int((flow_impact_df["status"] == "rerouted").sum())
+        delivered_count = int((flow_impact_df["status"] == "delivered").sum())
+
+    secondary_failures = False
+    if (
+        step_metrics_df is not None
+        and not step_metrics_df.empty
+        and "step" in step_metrics_df.columns
+        and "new_failed_edge_count" in step_metrics_df.columns
+        and "new_failed_node_count" in step_metrics_df.columns
+    ):
+        later_steps = step_metrics_df[step_metrics_df["step"] > 0]
+        if not later_steps.empty:
+            secondary_failures = bool((later_steps["new_failed_edge_count"].sum() > 0) or (later_steps["new_failed_node_count"].sum() > 0))
+
+    parts = []
+
+    if total_flows > 0:
+        parts.append(
+            f"The disruption affected {disrupted_flows} of {total_flows} tracked flows, " f"leaving a service level of {service_level:.1%}."
+        )
+
+    if rerouted_count > 0:
+        parts.append(
+            f"{rerouted_count} surviving flow{'s were' if rerouted_count != 1 else ' was'} rerouted, "
+            "indicating partial resilience through alternate paths."
+        )
+    elif delivered_count > 0:
+        parts.append(f"{delivered_count} flow{'s remained' if delivered_count != 1 else ' remained'} serviceable " "without rerouting.")
+
+    if secondary_failures:
+        parts.append("Secondary failures occurred after the initial shock, showing that disruption propagated through the network.")
+    else:
+        parts.append("No secondary failures were observed beyond the initial disruption, suggesting the impact remained localized.")
+
+    if failed_nodes > 0 or failed_edges > 0:
+        parts.append(
+            f"Final network losses included {failed_nodes} failed node{'s' if failed_nodes != 1 else ''} "
+            f"and {failed_edges} failed edge{'s' if failed_edges != 1 else ''}."
+        )
+
+    return " ".join(parts)
