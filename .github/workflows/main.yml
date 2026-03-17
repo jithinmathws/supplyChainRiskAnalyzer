@@ -1,0 +1,5 @@
+- name: Check package index connectivity and Altair range
+  run: |
+    python -m pip install --upgrade pip
+    python -m pip index versions altair || true
+    python -m pip install --dry-run "altair>=5,<6"
