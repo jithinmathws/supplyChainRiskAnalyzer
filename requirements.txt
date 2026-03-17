@@ -2,6 +2,7 @@
 networkx>=3.2,<4
 pandas>=2.0,<3
 numpy>=1.24,<2.2
+networkx>=3.2,<4
 
 # Visualization
 matplotlib>=3.7,<4
