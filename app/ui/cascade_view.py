@@ -1,4 +1,3 @@
-import pandas as pd
 import services.graph_service as gs
 import streamlit as st
 from services.cascade_service import (
@@ -33,49 +32,6 @@ def format_edge_tuple(edge):
         u, v = edge
         return f"{u} → {v}"
     return str(edge)
-
-
-def load_uploaded_flows(flows_file):
-    """
-    Load flows.csv into cascade flow dicts.
-
-    Required columns:
-    - source
-    - target
-    - demand
-    """
-    df = pd.read_csv(flows_file)
-    flows_file.seek(0)
-
-    required_cols = {"source", "target", "demand"}
-    missing = required_cols - set(df.columns)
-    if missing:
-        raise ValueError(f"Missing flows.csv columns: {sorted(missing)}")
-
-    df["source"] = df["source"].astype(str).str.strip()
-    df["target"] = df["target"].astype(str).str.strip()
-    df["demand"] = pd.to_numeric(df["demand"], errors="raise")
-
-    if (df["demand"] < 0).any():
-        raise ValueError("Flow demand cannot be negative.")
-
-    return [
-        {
-            "source": row["source"],
-            "target": row["target"],
-            "demand": float(row["demand"]),
-        }
-        for _, row in df.iterrows()
-    ]
-
-
-def preview_uploaded_flows(flows_file, max_rows=5):
-    if flows_file is None:
-        return None
-
-    df = pd.read_csv(flows_file)
-    flows_file.seek(0)
-    return df.head(max_rows)
 
 
 def render_cascade_builder(graph, graph_signature, node_options):
@@ -177,7 +133,7 @@ def render_cascade_builder(graph, graph_signature, node_options):
                 edge_id = data.get("edge_id", str(k))
                 edge_label = f"{u} → {v} ({edge_id})"
                 edge_options.append(edge_label)
-                edge_label_to_tuple[edge_label] = (str(u), str(v), k)
+                edge_label_to_tuple[edge_label] = (str(u), str(v), str(k))
         else:
             for u, v, data in graph.edges(data=True):
                 edge_id = data.get("edge_id", f"{u}->{v}")
@@ -226,6 +182,40 @@ def render_cascade_builder(graph, graph_signature, node_options):
             key="cascade_default_capacity",
         )
 
+    st.markdown("### Economic Impact Parameters")
+
+    econ_col1, econ_col2, econ_col3 = st.columns(3)
+
+    with econ_col1:
+        reroute_cost_rate = st.number_input(
+            "Reroute Cost Rate",
+            min_value=0.0,
+            value=1.0,
+            step=0.5,
+            key="cascade_reroute_cost_rate",
+            help="Cost multiplier applied to added route cost for delivered demand.",
+        )
+
+    with econ_col2:
+        delay_penalty_rate = st.number_input(
+            "Delay Penalty Rate",
+            min_value=0.0,
+            value=2.0,
+            step=0.5,
+            key="cascade_delay_penalty_rate",
+            help="Penalty multiplier applied to added route cost for delivered demand.",
+        )
+
+    with econ_col3:
+        unmet_demand_loss_rate = st.number_input(
+            "Unmet Demand Loss Rate",
+            min_value=0.0,
+            value=5.0,
+            step=0.5,
+            key="cascade_unmet_demand_loss_rate",
+            help="Loss applied per unit of unmet demand.",
+        )
+
     run_cascade = st.button("Run Cascade Simulation", type="secondary")
 
     cascade_result = None
@@ -254,6 +244,9 @@ def render_cascade_builder(graph, graph_signature, node_options):
                     demand_per_flow=None,
                     _graph=graph,
                     flows_from_csv=True,
+                    reroute_cost_rate=float(reroute_cost_rate),
+                    delay_penalty_rate=float(delay_penalty_rate),
+                    unmet_demand_loss_rate=float(unmet_demand_loss_rate),
                 )
 
                 cascade_overview = build_cascade_overview(cascade_result, step_metrics_df)
@@ -282,6 +275,9 @@ def render_cascade_builder(graph, graph_signature, node_options):
                     demand_per_flow=float(demand_per_flow),
                     _graph=graph,
                     flows_from_csv=False,
+                    reroute_cost_rate=float(reroute_cost_rate),
+                    delay_penalty_rate=float(delay_penalty_rate),
+                    unmet_demand_loss_rate=float(unmet_demand_loss_rate),
                 )
 
                 cascade_overview = build_cascade_overview(cascade_result, step_metrics_df)
@@ -312,7 +308,7 @@ def render_cascade_analysis_tab(
     cascade_insight,
 ):
     st.subheader("Cascade Simulation")
-    st.write("Simulate rerouting, overload propagation, and cascading failures across the network.")
+    st.write("Simulate rerouting, overload propagation, cascading failures, and economic impact across the network.")
 
     if cascade_result is None or step_metrics_df is None:
         st.info("Configure a disruption scenario and run cascade simulation to view results.")
@@ -326,6 +322,12 @@ def render_cascade_analysis_tab(
     metric_col4.metric("Unmet Demand", f"{cascade_overview.get('unmet_demand', 0.0):.1f}")
     metric_col5.metric("Failed Nodes", cascade_overview.get("failed_node_count", 0))
     metric_col6.metric("Failed Edges", cascade_overview.get("failed_edge_count", 0))
+
+    econ_metric_col1, econ_metric_col2, econ_metric_col3, econ_metric_col4 = st.columns(4)
+    econ_metric_col1.metric("Reroute Cost", f"{cascade_overview.get('total_reroute_cost', 0.0):.2f}")
+    econ_metric_col2.metric("Delay Penalty", f"{cascade_overview.get('total_delay_penalty', 0.0):.2f}")
+    econ_metric_col3.metric("Unmet Demand Loss", f"{cascade_overview.get('total_unmet_demand_loss', 0.0):.2f}")
+    econ_metric_col4.metric("Total Economic Impact", f"{cascade_overview.get('total_economic_impact', 0.0):.2f}")
 
     if cascade_insight:
         st.markdown("### Insight")

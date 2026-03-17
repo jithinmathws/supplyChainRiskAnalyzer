@@ -55,6 +55,9 @@ def run_cascade_analysis_cached(
     demand_per_flow,
     _graph,
     flows_from_csv=False,
+    reroute_cost_rate=1.0,
+    delay_penalty_rate=2.0,
+    unmet_demand_loss_rate=5.0,
 ):
     del graph_signature
 
@@ -62,6 +65,9 @@ def run_cascade_analysis_cached(
         _graph,
         default_capacity=float(default_capacity),
         default_weight=float(default_weight),
+        reroute_cost_rate=float(reroute_cost_rate),
+        delay_penalty_rate=float(delay_penalty_rate),
+        unmet_demand_loss_rate=float(unmet_demand_loss_rate),
     )
 
     if flows_from_csv:
@@ -96,7 +102,7 @@ def build_cascade_overview(result, step_metrics_df):
     metrics = result.get("metrics", {})
 
     collapse_step = None
-    if not step_metrics_df.empty:
+    if step_metrics_df is not None and not step_metrics_df.empty:
         collapsed_rows = step_metrics_df[step_metrics_df["routed_demand"] == 0]
         if not collapsed_rows.empty:
             collapse_step = collapsed_rows.iloc[0]["step"]
@@ -108,6 +114,10 @@ def build_cascade_overview(result, step_metrics_df):
         "unmet_demand": metrics.get("unmet_demand", 0.0),
         "failed_node_count": metrics.get("failed_node_count", 0),
         "failed_edge_count": metrics.get("failed_edge_count", 0),
+        "total_reroute_cost": metrics.get("total_reroute_cost", 0.0),
+        "total_delay_penalty": metrics.get("total_delay_penalty", 0.0),
+        "total_unmet_demand_loss": metrics.get("total_unmet_demand_loss", 0.0),
+        "total_economic_impact": metrics.get("total_economic_impact", 0.0),
         "collapse_step": int(collapse_step) if collapse_step is not None else None,
     }
 
@@ -123,6 +133,9 @@ def build_cascade_insight(result, flow_impact_df, step_metrics_df):
     failed_nodes = int(metrics.get("failed_node_count", 0))
     failed_edges = int(metrics.get("failed_edge_count", 0))
     service_level = float(metrics.get("service_level", 0.0))
+
+    total_economic_impact = float(metrics.get("total_economic_impact", 0.0))
+    total_unmet_demand_loss = float(metrics.get("total_unmet_demand_loss", 0.0))
 
     rerouted_count = 0
     delivered_count = 0
@@ -167,6 +180,12 @@ def build_cascade_insight(result, flow_impact_df, step_metrics_df):
         parts.append(
             f"Final network losses included {failed_nodes} failed node{'s' if failed_nodes != 1 else ''} "
             f"and {failed_edges} failed edge{'s' if failed_edges != 1 else ''}."
+        )
+
+    if total_economic_impact > 0:
+        parts.append(
+            f"Estimated total economic impact was {total_economic_impact:.2f}, "
+            f"including unmet demand loss of {total_unmet_demand_loss:.2f}."
         )
 
     return " ".join(parts)
