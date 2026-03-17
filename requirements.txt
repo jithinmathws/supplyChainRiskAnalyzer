@@ -15,11 +15,11 @@ pydeck>=0.8
 streamlit>=1.30,<2
 
 # Geospatial (optional, heavy)
-geopandas>=0.14
+#geopandas>=0.14
 shapely>=2.0
 pyproj>=3.5
-pyogrio>=0.7
-osmnx>=1.7
+#pyogrio>=0.7
+#osmnx>=1.7
 
 # Data / utils
 requests>=2.30
