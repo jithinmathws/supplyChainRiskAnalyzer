@@ -1,6 +1,31 @@
 node_id,name,type,location,capacity
-1,Shanghai Port,Port,China,High
-2,Rotterdam Port,Port,Netherlands,High
-3,Supplier A,Supplier,Vietnam,Medium
-4,Factory B,Factory,India,Large
-5,Warehouse D,Warehouse,Germany,Medium
+1,Lithium Supplier Chile,supplier,Chile,120
+2,Copper Supplier Peru,supplier,Peru,110
+3,Rare Earth Supplier China,supplier,China,140
+4,Battery Cell Supplier Korea,supplier,South Korea,130
+5,Chip Supplier Taiwan,supplier,Taiwan,150
+6,Screen Supplier Vietnam,supplier,Vietnam,120
+7,Casing Supplier India,supplier,India,100
+8,Assembly Plant Shenzhen,plant,China,180
+9,Assembly Plant Chennai,plant,India,160
+10,Assembly Plant Warsaw,plant,Poland,140
+11,Port Shanghai,port,China,220
+12,Port Singapore,port,Singapore,200
+13,Port Rotterdam,port,Netherlands,210
+14,Port Dubai,port,UAE,190
+15,Warehouse Frankfurt,warehouse,Germany,160
+16,Warehouse Paris,warehouse,France,150
+17,Warehouse Milan,warehouse,Italy,140
+18,Warehouse Chicago,warehouse,USA,170
+19,Warehouse Los Angeles,warehouse,USA,180
+20,DC London,distribution,UK,150
+21,DC Madrid,distribution,Spain,140
+22,DC New York,distribution,USA,160
+23,DC Toronto,distribution,Canada,130
+24,Retail Market UK,customer,UK,120
+25,Retail Market France,customer,France,120
+26,Retail Market Germany,customer,Germany,130
+27,Retail Market Spain,customer,Spain,110
+28,Retail Market US East,customer,USA East,140
+29,Retail Market US West,customer,USA West,140
+30,Retail Market Canada,customer,Canada,100

@@ -1,23 +1,17 @@
+import pandas as pd
+import services.graph_service as gs
 import streamlit as st
 from services.cascade_service import (
     build_cascade_insight,
     build_cascade_overview,
     run_cascade_analysis_cached,
 )
-from services.graph_service import get_available_scenario_flows, get_default_scenario_flows
 
 
 def normalize_edge_tuple(edge):
-    """
-    Normalize disrupted edge tuples for cache-safe transport.
-
-    Supports:
-    - (u, v)
-    - (u, v, key)
-    """
     if len(edge) == 3:
         u, v, k = edge
-        return (str(u), str(v), k)
+        return (str(u), str(v), str(k))
     if len(edge) == 2:
         u, v = edge
         return (str(u), str(v))
@@ -41,24 +35,78 @@ def format_edge_tuple(edge):
     return str(edge)
 
 
+def load_uploaded_flows(flows_file):
+    """
+    Load flows.csv into cascade flow dicts.
+
+    Required columns:
+    - source
+    - target
+    - demand
+    """
+    df = pd.read_csv(flows_file)
+    flows_file.seek(0)
+
+    required_cols = {"source", "target", "demand"}
+    missing = required_cols - set(df.columns)
+    if missing:
+        raise ValueError(f"Missing flows.csv columns: {sorted(missing)}")
+
+    df["source"] = df["source"].astype(str).str.strip()
+    df["target"] = df["target"].astype(str).str.strip()
+    df["demand"] = pd.to_numeric(df["demand"], errors="raise")
+
+    if (df["demand"] < 0).any():
+        raise ValueError("Flow demand cannot be negative.")
+
+    return [
+        {
+            "source": row["source"],
+            "target": row["target"],
+            "demand": float(row["demand"]),
+        }
+        for _, row in df.iterrows()
+    ]
+
+
+def preview_uploaded_flows(flows_file, max_rows=5):
+    if flows_file is None:
+        return None
+
+    df = pd.read_csv(flows_file)
+    flows_file.seek(0)
+    return df.head(max_rows)
+
+
 def render_cascade_builder(graph, graph_signature, node_options):
     st.markdown("---")
     st.subheader("Cascade Simulation Builder")
 
-    available_flows = get_available_scenario_flows(graph, node_options)
+    available_flows = gs.get_available_scenario_flows(graph, node_options)
     flow_labels = [item["label"] for item in available_flows]
 
     builder_mode = st.radio(
         "Cascade Flow Input Mode",
-        options=["Default Flows", "Custom Flows"],
+        options=["Default Flows", "Custom Flows", "Upload Flows CSV"],
         horizontal=True,
         key="cascade_builder_mode",
     )
 
+    selected_flows = []
+    uploaded_flow_dicts = None
+
     if builder_mode == "Default Flows":
-        selected_flows = get_default_scenario_flows()
-        st.info("Default cascade set uses predefined origin-destination flows. " "You can switch to Custom Flows for manual selection.")
-    else:
+        selected_flows = gs.get_default_scenario_flows(graph, node_options)
+
+        if selected_flows:
+            st.info(
+                "Default cascade set uses reachable origin-destination flows from the current graph. "
+                "You can switch to Custom Flows or Upload Flows CSV."
+            )
+        else:
+            st.warning("No valid default flows were found for the current graph. " "Please switch to Custom Flows or Upload Flows CSV.")
+
+    elif builder_mode == "Custom Flows":
         selected_flow_labels = st.multiselect(
             "Select one or more cascade flows",
             options=flow_labels,
@@ -74,6 +122,38 @@ def render_cascade_builder(graph, graph_signature, node_options):
                 st.write(f"- {label}")
         else:
             st.warning("Please select at least one cascade flow.")
+
+    else:
+        flows_file = st.file_uploader(
+            "Upload flows.csv",
+            type="csv",
+            key=f"cascade_flows_upload_{graph_signature}",
+        )
+
+        with st.expander("Required flows.csv columns"):
+            st.markdown(
+                """
+- `source`
+- `target`
+- `demand`
+                """
+            )
+
+        if flows_file is not None:
+            try:
+                preview_df = gs.preview_uploaded_flows(flows_file)
+                st.write("Preview: flows.csv")
+                st.dataframe(preview_df, use_container_width=True)
+
+                uploaded_flow_dicts = gs.load_uploaded_flows(flows_file)
+
+                st.success(f"Loaded {len(uploaded_flow_dicts)} flows from CSV.")
+
+            except Exception as exc:
+                st.error(f"Invalid flows.csv: {exc}")
+                uploaded_flow_dicts = None
+        else:
+            st.info("Upload a flows.csv file to use CSV-driven cascade demand.")
 
     st.markdown("### Initial Disruption Settings")
 
@@ -124,6 +204,7 @@ def render_cascade_builder(graph, graph_signature, node_options):
             value=45.0,
             step=5.0,
             key="cascade_demand_per_flow",
+            disabled=(builder_mode == "Upload Flows CSV"),
         )
 
     with param_col2:
@@ -154,34 +235,65 @@ def render_cascade_builder(graph, graph_signature, node_options):
     cascade_insight = ""
 
     if run_cascade:
-        if not selected_flows:
-            st.warning("Please select at least one flow before running cascade simulation.")
+        if builder_mode == "Upload Flows CSV":
+            if not uploaded_flow_dicts:
+                st.warning("Please upload a valid flows.csv before running cascade simulation.")
+            else:
+                disrupted_nodes_tuple = tuple(str(n) for n in disrupted_nodes)
+                disrupted_edges_tuple = tuple(normalize_edge_tuple(edge) for edge in disrupted_edges)
+                uploaded_flows_tuple = tuple((f["source"], f["target"], float(f["demand"])) for f in uploaded_flow_dicts)
+
+                cascade_result, step_metrics_df, flow_impact_df = run_cascade_analysis_cached(
+                    graph_signature=graph_signature,
+                    selected_flows_tuple=uploaded_flows_tuple,
+                    disrupted_nodes_tuple=disrupted_nodes_tuple,
+                    disrupted_edges_tuple=disrupted_edges_tuple,
+                    max_steps=int(max_steps),
+                    default_capacity=float(default_capacity),
+                    default_weight=1.0,
+                    demand_per_flow=None,
+                    _graph=graph,
+                    flows_from_csv=True,
+                )
+
+                cascade_overview = build_cascade_overview(cascade_result, step_metrics_df)
+                cascade_insight = build_cascade_insight(
+                    cascade_result,
+                    flow_impact_df,
+                    step_metrics_df,
+                )
+
         else:
-            selected_flows_tuple = tuple((str(o), str(d)) for o, d in selected_flows)
-            disrupted_nodes_tuple = tuple(str(n) for n in disrupted_nodes)
-            disrupted_edges_tuple = tuple(normalize_edge_tuple(edge) for edge in disrupted_edges)
+            if not selected_flows:
+                st.warning("Please select at least one flow before running cascade simulation.")
+            else:
+                selected_flows_tuple = tuple((str(o), str(d)) for o, d in selected_flows)
+                disrupted_nodes_tuple = tuple(str(n) for n in disrupted_nodes)
+                disrupted_edges_tuple = tuple(normalize_edge_tuple(edge) for edge in disrupted_edges)
 
-            cascade_result, step_metrics_df, flow_impact_df = run_cascade_analysis_cached(
-                graph_signature=graph_signature,
-                selected_flows_tuple=selected_flows_tuple,
-                disrupted_nodes_tuple=disrupted_nodes_tuple,
-                disrupted_edges_tuple=disrupted_edges_tuple,
-                max_steps=int(max_steps),
-                default_capacity=float(default_capacity),
-                default_weight=1.0,
-                demand_per_flow=float(demand_per_flow),
-                _graph=graph,
-            )
+                cascade_result, step_metrics_df, flow_impact_df = run_cascade_analysis_cached(
+                    graph_signature=graph_signature,
+                    selected_flows_tuple=selected_flows_tuple,
+                    disrupted_nodes_tuple=disrupted_nodes_tuple,
+                    disrupted_edges_tuple=disrupted_edges_tuple,
+                    max_steps=int(max_steps),
+                    default_capacity=float(default_capacity),
+                    default_weight=1.0,
+                    demand_per_flow=float(demand_per_flow),
+                    _graph=graph,
+                    flows_from_csv=False,
+                )
 
-            cascade_overview = build_cascade_overview(cascade_result, step_metrics_df)
-            cascade_insight = build_cascade_insight(
-                cascade_result,
-                flow_impact_df,
-                step_metrics_df,
-            )
+                cascade_overview = build_cascade_overview(cascade_result, step_metrics_df)
+                cascade_insight = build_cascade_insight(
+                    cascade_result,
+                    flow_impact_df,
+                    step_metrics_df,
+                )
 
     return {
         "selected_flows": selected_flows,
+        "uploaded_flow_dicts": uploaded_flow_dicts,
         "disrupted_nodes": disrupted_nodes,
         "disrupted_edges": disrupted_edges,
         "cascade_result": cascade_result,

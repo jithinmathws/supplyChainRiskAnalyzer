@@ -13,12 +13,20 @@ def test_run_baseline_analysis_returns_expected_keys():
     node_ids = list(node_options.values())
     assert len(node_ids) >= 2
 
-    origin_id = node_ids[0]
-    destination_id = node_ids[1]
+    reachable_pair = None
+    for origin_id in node_ids:
+        for destination_id in node_ids:
+            if origin_id == destination_id:
+                continue
+            if nx.has_path(graph, str(origin_id), str(destination_id)):
+                reachable_pair = (str(origin_id), str(destination_id))
+                break
+        if reachable_pair is not None:
+            break
 
-    if origin_id == destination_id and len(node_ids) > 2:
-        destination_id = node_ids[2]
+    assert reachable_pair is not None, "No reachable origin-destination pair found in graph."
 
+    origin_id, destination_id = reachable_pair
     result = run_baseline_analysis(graph, origin_id, destination_id)
 
     assert isinstance(result, dict)
@@ -38,15 +46,7 @@ def test_run_baseline_analysis_raises_for_no_path():
         run_baseline_analysis(graph, "A", "B")
 
 
-def test_baseline_route_uses_expected_path(small_supply_chain_graph, monkeypatch):
-    def fake_get_baseline_route(graph, origin_id, destination_id):
-        return ["A", "B", "D"], ["Supplier A", "Hub B", "Customer D"], 2
-
-    monkeypatch.setattr(
-        "app.services.analysis_service.get_baseline_route",
-        fake_get_baseline_route,
-    )
-
+def test_baseline_route_uses_expected_path(small_supply_chain_graph):
     result = run_baseline_analysis(small_supply_chain_graph, "A", "D")
 
     assert result["baseline_route_ids"] == ["A", "B", "D"]

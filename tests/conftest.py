@@ -21,10 +21,50 @@ def small_supply_chain_graph():
     G.add_node("C", name="Hub C", type="hub", location="Loc C", capacity=100)
     G.add_node("D", name="Customer D", type="customer", location="Loc D", capacity=100)
 
-    G.add_edge("A", "B", key="road", weight=1, capacity=100)
-    G.add_edge("B", "D", key="road", weight=1, capacity=100)
+    G.add_edge(
+        "A",
+        "B",
+        key="E1",
+        edge_id="E1",
+        transport_mode="road",
+        distance=10,
+        transport_time=1,
+        weight=1,
+        capacity=100,
+    )
+    G.add_edge(
+        "B",
+        "D",
+        key="E2",
+        edge_id="E2",
+        transport_mode="road",
+        distance=10,
+        transport_time=1,
+        weight=1,
+        capacity=100,
+    )
 
-    G.add_edge("A", "C", key="rail", weight=2, capacity=100)
-    G.add_edge("C", "D", key="rail", weight=2, capacity=100)
+    G.add_edge(
+        "A",
+        "C",
+        key="E3",
+        edge_id="E3",
+        transport_mode="rail",
+        distance=20,
+        transport_time=2,
+        weight=2,
+        capacity=100,
+    )
+    G.add_edge(
+        "C",
+        "D",
+        key="E4",
+        edge_id="E4",
+        transport_mode="rail",
+        distance=20,
+        transport_time=2,
+        weight=2,
+        capacity=100,
+    )
 
     return G

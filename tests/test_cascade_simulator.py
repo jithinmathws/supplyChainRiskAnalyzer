@@ -29,6 +29,9 @@ def test_disrupted_edge_reroutes_flow_without_failures():
     assert result["metrics"]["service_level"] == 1.0
     assert flow["status"] == "rerouted"
     assert flow["final_path"] == ["A", "C", "D"]
+    assert flow["baseline_path"] == ["A", "B", "D"]
+    assert flow["baseline_cost"] == 2.0
+    assert flow["final_cost"] == 4.0
 
 
 def test_overload_causes_cascade_and_unmet_demand():
@@ -50,3 +53,6 @@ def test_overload_causes_cascade_and_unmet_demand():
     assert result["metrics"]["service_level"] == 0.0
     assert flow["status"] == "disrupted"
     assert flow["final_path"] is None
+    assert flow["baseline_path"] == ["A", "B", "D"]
+    assert flow["baseline_cost"] == 2.0
+    assert flow["delivered_demand"] == 0.0

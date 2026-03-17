@@ -27,9 +27,7 @@ class CascadeSimulator:
         default_weight=1.0,
     ):
         if not G.is_directed():
-            raise ValueError(
-                "CascadeSimulator currently requires a directed graph (DiGraph or MultiDiGraph)."
-            )
+            raise ValueError("CascadeSimulator currently requires a directed graph (DiGraph or MultiDiGraph).")
 
         self.original_graph = deepcopy(G)
         self.default_capacity = float(default_capacity)
@@ -98,7 +96,7 @@ class CascadeSimulator:
         """
         self.reset()
 
-        disrupted_nodes = disrupted_nodes or []
+        disrupted_nodes = [str(n).strip() for n in (disrupted_nodes or [])]
         disrupted_edges = disrupted_edges or []
         flows = flows or []
 
@@ -138,15 +136,15 @@ class CascadeSimulator:
         """
         for i, flow in enumerate(flows):
             if not isinstance(flow, dict):
-                raise ValueError(
-                    f"Flow at index {i} must be a dict like "
-                    f"{{'source': 'A', 'target': 'D', 'demand': 40}}"
-                )
+                raise ValueError(f"Flow at index {i} must be a dict like " f"{{'source': 'A', 'target': 'D', 'demand': 40}}")
 
             required_keys = {"source", "target", "demand"}
             missing = required_keys - set(flow.keys())
             if missing:
                 raise ValueError(f"Flow {i} missing keys: {missing}")
+
+            flow["source"] = str(flow["source"]).strip()
+            flow["target"] = str(flow["target"]).strip()
 
             s, t = flow["source"], flow["target"]
 
@@ -154,6 +152,8 @@ class CascadeSimulator:
                 d = float(flow["demand"])
             except (TypeError, ValueError):
                 raise ValueError(f"Invalid demand for flow {i}: {flow['demand']}")
+
+            flow["demand"] = d
 
             if s not in self.original_graph or t not in self.original_graph:
                 raise ValueError(f"Invalid flow: ({s}, {t}) not in original graph")
@@ -477,12 +477,8 @@ class CascadeSimulator:
                     "demand": float(item.get("demand", 0.0)),
                     "status": item.get("status"),
                     "rerouted": item.get("rerouted", False),
-                    "baseline_path": (
-                        " → ".join(map(str, item["baseline_path"])) if item.get("baseline_path") else None
-                    ),
-                    "final_path": (
-                        " → ".join(map(str, item["final_path"])) if item.get("final_path") else None
-                    ),
+                    "baseline_path": (" → ".join(map(str, item["baseline_path"])) if item.get("baseline_path") else None),
+                    "final_path": (" → ".join(map(str, item["final_path"])) if item.get("final_path") else None),
                     "baseline_cost": item.get("baseline_cost"),
                     "final_cost": item.get("final_cost"),
                     "cost_increase": item.get("cost_increase"),
@@ -603,13 +599,9 @@ class CascadeSimulator:
                 except (nx.NetworkXNoPath, nx.NodeNotFound):
                     status = "disrupted"
 
-            cost_increase = (
-                final_cost - baseline_cost if baseline_cost is not None and final_cost is not None else None
-            )
+            cost_increase = final_cost - baseline_cost if baseline_cost is not None and final_cost is not None else None
 
-            hop_increase = (
-                final_hops - baseline_hops if baseline_hops is not None and final_hops is not None else None
-            )
+            hop_increase = final_hops - baseline_hops if baseline_hops is not None and final_hops is not None else None
 
             records.append(
                 {

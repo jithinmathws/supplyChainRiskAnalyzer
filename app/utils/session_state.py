@@ -1,6 +1,7 @@
 import streamlit as st
 
 DEFAULT_SESSION_STATE = {
+    "graph_source": "default",
     "analysis_ran": False,
     "baseline_route_names": [],
     "baseline_route_ids": [],
@@ -18,6 +19,7 @@ DEFAULT_SESSION_STATE = {
     "cascade_overview": {},
     "cascade_flow_impact_df": None,
     "cascade_insight": "",
+    "uploaded_flow_dicts": None,
 }
 
 
@@ -29,4 +31,6 @@ def initialize_session_state():
 
 def reset_analysis_state():
     for key, value in DEFAULT_SESSION_STATE.items():
+        if key == "graph_source":
+            continue
         st.session_state[key] = value.copy() if isinstance(value, (dict, list)) else value

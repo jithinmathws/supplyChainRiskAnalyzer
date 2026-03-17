@@ -57,11 +57,20 @@ def test_graph_builder_builds_valid_graph(tmp_path):
     builder.load_data()
     G = builder.build_graph()
 
+    edge_data = G["A"]["B"]
+    first_key = next(iter(edge_data))
+    attrs = edge_data[first_key]
+
+    assert attrs["transport_mode"] == "road"
+    assert attrs["transport_time"] == 1
+    assert attrs["weight"] == 1
+
     assert G.number_of_nodes() == 3
     assert G.number_of_edges() == 2
     assert "A" in G.nodes
     assert G.nodes["A"]["name"] == "Supplier A"
     assert G.has_edge("A", "B")
+    assert "edge_id" in attrs
 
 
 def test_graph_builder_fails_when_edge_references_missing_node(tmp_path):

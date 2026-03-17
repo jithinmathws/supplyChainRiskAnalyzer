@@ -19,9 +19,7 @@ class ScenarioAnalyzer:
 
         for source_id, target_id in flows:
             result_df = self.node_detector.rank_node_bottlenecks(
-                source_id=source_id,
-                target_id=target_id,
-                exclude_terminals=exclude_terminals
+                source_id=source_id, target_id=target_id, exclude_terminals=exclude_terminals
             ).copy()
 
             result_df["scenario_source"] = str(source_id)
@@ -43,9 +41,7 @@ class ScenarioAnalyzer:
 
         for source_id, target_id in flows:
             result_df = self.edge_detector.rank_edge_bottlenecks(
-                source_id=source_id,
-                target_id=target_id,
-                only_active_route_edges=only_active_route_edges
+                source_id=source_id, target_id=target_id, only_active_route_edges=only_active_route_edges
             ).copy()
 
             result_df["scenario_source"] = str(source_id)
@@ -66,22 +62,18 @@ class ScenarioAnalyzer:
         if node_results_df.empty:
             return pd.DataFrame()
 
-        summary = (
-            node_results_df.groupby(["node_id", "node_name", "node_type"], as_index=False)
-            .agg(
-                scenarios_evaluated=("scenario", "count"),
-                catastrophic_count=("status", lambda s: (s == "Disconnected").sum()),
-                rerouted_count=("status", lambda s: (s == "Rerouted").sum()),
-                avg_impact_score=("impact_score", "mean"),
-                max_impact_score=("impact_score", "max"),
-                avg_lead_time_increase=("lead_time_increase", "mean"),
-                max_lead_time_increase=("lead_time_increase", "max"),
-            )
+        summary = node_results_df.groupby(["node_id", "node_name", "node_type"], as_index=False).agg(
+            scenarios_evaluated=("scenario", "count"),
+            catastrophic_count=("status", lambda s: (s == "Disconnected").sum()),
+            rerouted_count=("status", lambda s: (s == "Rerouted").sum()),
+            avg_impact_score=("impact_score", "mean"),
+            max_impact_score=("impact_score", "max"),
+            avg_lead_time_increase=("lead_time_increase", "mean"),
+            max_lead_time_increase=("lead_time_increase", "max"),
         )
 
         summary = summary.sort_values(
-            by=["catastrophic_count", "max_impact_score", "avg_impact_score"],
-            ascending=[False, False, False]
+            by=["catastrophic_count", "max_impact_score", "avg_impact_score"], ascending=[False, False, False]
         ).reset_index(drop=True)
 
         return summary
@@ -93,25 +85,18 @@ class ScenarioAnalyzer:
         if edge_results_df.empty:
             return pd.DataFrame()
 
-        summary = (
-            edge_results_df.groupby(
-                ["edge_id", "source_node", "target_node", "transport_mode"],
-                as_index=False
-            )
-            .agg(
-                scenarios_evaluated=("scenario", "count"),
-                catastrophic_count=("status", lambda s: (s == "Disconnected").sum()),
-                rerouted_count=("status", lambda s: (s == "Rerouted").sum()),
-                avg_impact_score=("impact_score", "mean"),
-                max_impact_score=("impact_score", "max"),
-                avg_lead_time_increase=("lead_time_increase", "mean"),
-                max_lead_time_increase=("lead_time_increase", "max"),
-            )
+        summary = edge_results_df.groupby(["edge_id", "source_node", "target_node", "edge_key"], as_index=False).agg(
+            scenarios_evaluated=("scenario", "count"),
+            catastrophic_count=("status", lambda s: (s == "Disconnected").sum()),
+            rerouted_count=("status", lambda s: (s == "Rerouted").sum()),
+            avg_impact_score=("impact_score", "mean"),
+            max_impact_score=("impact_score", "max"),
+            avg_lead_time_increase=("lead_time_increase", "mean"),
+            max_lead_time_increase=("lead_time_increase", "max"),
         )
 
         summary = summary.sort_values(
-            by=["catastrophic_count", "max_impact_score", "avg_impact_score"],
-            ascending=[False, False, False]
+            by=["catastrophic_count", "max_impact_score", "avg_impact_score"], ascending=[False, False, False]
         ).reset_index(drop=True)
 
         return summary
@@ -145,10 +130,7 @@ class ScenarioAnalyzer:
 if __name__ == "__main__":
     from core.graph_builder import SupplyChainGraph
 
-    builder = SupplyChainGraph(
-        "data/nodes.csv",
-        ["data/edges.csv", "data/alternate_edges.csv"]
-    )
+    builder = SupplyChainGraph("data/nodes.csv", ["data/edges.csv", "data/alternate_edges.csv"])
     builder.load_data()
     G = builder.build_graph()
 

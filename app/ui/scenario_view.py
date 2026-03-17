@@ -20,11 +20,12 @@ def render_scenario_builder(graph, graph_signature, node_options):
     )
 
     if builder_mode == "Default Flows":
-        selected_flows = get_default_scenario_flows()
-        st.info(
-            "Default scenario set uses predefined origin-destination flows such as "
-            "Supplier A → Warehouse D, Supplier A → Rotterdam Port, and Factory B → Warehouse D."
-        )
+        selected_flows = get_default_scenario_flows(graph, node_options)
+
+        if selected_flows:
+            st.info("Default scenario set uses reachable origin-destination flows from the current graph.")
+        else:
+            st.warning("No valid default flows were found for the current graph. " "Please switch to Custom Flows.")
     else:
         selected_flow_labels = st.multiselect(
             "Select one or more scenario flows",

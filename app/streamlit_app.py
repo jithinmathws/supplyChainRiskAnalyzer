@@ -20,14 +20,38 @@ st.set_page_config(page_title="Supply Chain Fragility Analyzer", layout="wide")
 st.title("Supply Chain Fragility & Risk Analyzer")
 st.write("Interactive analysis of node and edge disruptions in the supply chain network.")
 
-graph = load_graph()
+initialize_session_state()
+
+graph = st.session_state.get("graph")
+if graph is None:
+    graph = load_graph()
+    st.session_state.graph_source = "default"
+
 graph_signature = get_graph_signature(graph)
 node_options = get_node_options(graph)
 labels = list(node_options.keys())
 
-initialize_session_state()
-
 controls = render_sidebar(node_options, labels)
+
+# Re-read graph after sidebar actions, because user may have uploaded a new one
+graph = st.session_state.get("graph")
+if graph is None:
+    graph = load_graph()
+    st.session_state.graph_source = "default"
+
+graph_signature = get_graph_signature(graph)
+node_options = get_node_options(graph)
+labels = list(node_options.keys())
+
+source_label = st.session_state.get("graph_source", "default")
+if source_label == "uploaded":
+    st.success("Using uploaded graph for analysis.")
+else:
+    st.info("Using default sample graph for analysis.")
+
+if len(labels) < 2:
+    st.error("Graph must contain at least two nodes to run analysis.")
+    st.stop()
 
 col1, col2 = st.columns(2)
 
@@ -44,7 +68,7 @@ with col2:
 origin_id = node_options[origin_label]
 destination_id = node_options[destination_label]
 
-current_selection = (origin_id, destination_id)
+current_selection = (origin_id, destination_id, graph_signature)
 
 if "last_selection" not in st.session_state:
     st.session_state.last_selection = current_selection
@@ -131,7 +155,6 @@ if st.session_state.analysis_ran:
             node_options=node_options,
         )
 
-        # Only update session state if a cascade simulation was actually run
         if cascade_data["cascade_result"] is not None:
             st.session_state.cascade_result = cascade_data["cascade_result"]
             st.session_state.cascade_step_metrics_df = cascade_data["step_metrics_df"]

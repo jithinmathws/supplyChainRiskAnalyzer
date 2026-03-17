@@ -4,16 +4,28 @@ import streamlit as st
 from analysis.cascade_simulator import CascadeSimulator
 
 
-def _normalize_flows(selected_flows, default_demand=40.0):
+def _normalize_flows(selected_flows, default_demand=40.0, flows_from_csv=False):
     normalized = []
-    for origin_id, destination_id in selected_flows:
-        normalized.append(
-            {
-                "source": str(origin_id),
-                "target": str(destination_id),
-                "demand": float(default_demand),
-            }
-        )
+
+    if flows_from_csv:
+        for source, target, demand in selected_flows:
+            normalized.append(
+                {
+                    "source": str(source),
+                    "target": str(target),
+                    "demand": float(demand),
+                }
+            )
+    else:
+        for origin_id, destination_id in selected_flows:
+            normalized.append(
+                {
+                    "source": str(origin_id),
+                    "target": str(destination_id),
+                    "demand": float(default_demand),
+                }
+            )
+
     return normalized
 
 
@@ -22,7 +34,7 @@ def _normalize_disrupted_edges(disrupted_edges):
     for edge in disrupted_edges:
         if len(edge) == 3:
             u, v, k = edge
-            normalized.append((str(u), str(v), k))
+            normalized.append((str(u), str(v), str(k)))
         elif len(edge) == 2:
             u, v = edge
             normalized.append((str(u), str(v)))
@@ -42,6 +54,7 @@ def run_cascade_analysis_cached(
     default_weight,
     demand_per_flow,
     _graph,
+    flows_from_csv=False,
 ):
     del graph_signature
 
@@ -51,12 +64,19 @@ def run_cascade_analysis_cached(
         default_weight=float(default_weight),
     )
 
-    flow_dicts = _normalize_flows(
-        selected_flows_tuple,
-        default_demand=float(demand_per_flow),
-    )
+    if flows_from_csv:
+        flow_dicts = _normalize_flows(
+            selected_flows_tuple,
+            flows_from_csv=True,
+        )
+    else:
+        flow_dicts = _normalize_flows(
+            selected_flows_tuple,
+            default_demand=float(demand_per_flow),
+            flows_from_csv=False,
+        )
 
-    disrupted_nodes = [str(node) for node in disrupted_nodes_tuple]
+    disrupted_nodes = [str(node).strip() for node in disrupted_nodes_tuple]
     disrupted_edges = _normalize_disrupted_edges(disrupted_edges_tuple)
 
     result = simulator.run_simulation(

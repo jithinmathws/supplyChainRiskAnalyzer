@@ -17,7 +17,7 @@ class FragilityAnalyzer:
             reduced.add_node(node, **attrs)
 
         for u, v, key, data in self.G.edges(keys=True, data=True):
-            weight = data.get("transport_time", float("inf"))
+            weight = data.get("weight", data.get("transport_time", float("inf")))
 
             if reduced.has_edge(u, v):
                 existing_weight = reduced[u][v]["transport_time"]
@@ -34,21 +34,23 @@ class FragilityAnalyzer:
         degree = nx.degree_centrality(H)
         in_degree = nx.in_degree_centrality(H)
         out_degree = nx.out_degree_centrality(H)
-        betweenness = nx.betweenness_centrality(H, weight="transport_time")
-        closeness = nx.closeness_centrality(H, distance="transport_time")
+        betweenness = nx.betweenness_centrality(H, weight="weight")
+        closeness = nx.closeness_centrality(H, distance="weight")
 
         metrics = []
         for node_id in H.nodes():
-            metrics.append({
-                "node_id": node_id,
-                "name": H.nodes[node_id].get("name", "Unknown"),
-                "type": H.nodes[node_id].get("type", "Unknown"),
-                "degree_centrality": degree[node_id],
-                "in_degree_centrality": in_degree[node_id],
-                "out_degree_centrality": out_degree[node_id],
-                "bottleneck_score": betweenness[node_id],
-                "closeness_centrality": closeness[node_id],
-            })
+            metrics.append(
+                {
+                    "node_id": node_id,
+                    "name": H.nodes[node_id].get("name", "Unknown"),
+                    "type": H.nodes[node_id].get("type", "Unknown"),
+                    "degree_centrality": degree[node_id],
+                    "in_degree_centrality": in_degree[node_id],
+                    "out_degree_centrality": out_degree[node_id],
+                    "bottleneck_score": betweenness[node_id],
+                    "closeness_centrality": closeness[node_id],
+                }
+            )
 
         return pd.DataFrame(metrics).sort_values(by="bottleneck_score", ascending=False)
 
@@ -69,7 +71,7 @@ class FragilityAnalyzer:
                 "path_node_names": path_names,
                 "route": " -> ".join(path_names),
                 "total_lead_time_days": total_time,
-                "stops": len(path) - 1
+                "stops": len(path) - 1,
             }
 
         except (nx.NetworkXNoPath, nx.NodeNotFound):
@@ -83,12 +85,7 @@ class FragilityAnalyzer:
         H = self._to_weighted_digraph()
 
         if disrupted_node not in H:
-            return {
-                "status": "Error",
-                "impact": f"Node {disrupted_node} not found in graph.",
-                "new_route": None,
-                "new_lead_time": None
-            }
+            return {"status": "Error", "impact": f"Node {disrupted_node} not found in graph.", "new_route": None, "new_lead_time": None}
 
         disrupted_name = H.nodes[disrupted_node].get("name", disrupted_node)
 
@@ -104,7 +101,7 @@ class FragilityAnalyzer:
                 "status": "Rerouted",
                 "impact": f"Disruption at {disrupted_name} handled.",
                 "new_route": " -> ".join(new_path_names),
-                "new_lead_time": new_time
+                "new_lead_time": new_time,
             }
 
         except (nx.NetworkXNoPath, nx.NodeNotFound):
@@ -112,17 +109,14 @@ class FragilityAnalyzer:
                 "status": "Disconnected",
                 "impact": f"Disruption at {disrupted_name} breaks the supply route.",
                 "new_route": None,
-                "new_lead_time": None
+                "new_lead_time": None,
             }
 
 
 if __name__ == "__main__":
     from graph_builder import SupplyChainGraph
 
-    builder = SupplyChainGraph(
-        "data/nodes.csv",
-        ["data/edges.csv", "data/alternate_edges.csv"]
-    )
+    builder = SupplyChainGraph("data/nodes.csv", ["data/edges.csv", "data/alternate_edges.csv"])
     builder.load_data()
     G = builder.build_graph()
     builder.print_edges()

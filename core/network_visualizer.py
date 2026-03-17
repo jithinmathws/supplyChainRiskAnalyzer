@@ -13,15 +13,6 @@ class NetworkVisualizer:
     """
     Builds interactive network visualizations for the
     Supply Chain Fragility & Risk Analyzer.
-
-    Features:
-    - Base directed graph rendering
-    - Node sizing by selected metric
-    - Node coloring by selected mode
-    - Edge thickness by selected metric
-    - Scenario failure highlighting
-    - Optional edge/node labels
-    - HTML export for Streamlit embedding
     """
 
     DEFAULT_NODE_COLOR = "#6baed6"
@@ -29,7 +20,9 @@ class NetworkVisualizer:
     BOTTLENECK_NODE_COLOR = "#ff7f0e"
     SOURCE_NODE_COLOR = "#2ca02c"
     SINK_NODE_COLOR = "#1f77b4"
+
     NORMAL_EDGE_COLOR = "#9e9e9e"
+    MUTED_EDGE_COLOR = "#d9d9d9"
     FAILED_EDGE_COLOR = "#d62728"
     HIGHLIGHT_EDGE_COLOR = "#ff7f0e"
 
@@ -47,10 +40,6 @@ class NetworkVisualizer:
         self.bgcolor = bgcolor
         self.font_color = font_color
 
-    # -------------------------------------------------------------------------
-    # Public API
-    # -------------------------------------------------------------------------
-
     def build_pyvis_network(
         self,
         G: nx.DiGraph,
@@ -60,54 +49,17 @@ class NetworkVisualizer:
         show_node_labels: bool = True,
         show_edge_labels: bool = False,
         failed_nodes: Optional[Iterable[Any]] = None,
-        failed_edges: Optional[Iterable[Tuple[Any, Any]]] = None,
+        failed_edges: Optional[Iterable[Tuple[Any, ...]]] = None,
         highlighted_nodes: Optional[Iterable[Any]] = None,
-        highlighted_edges: Optional[Iterable[Tuple[Any, Any]]] = None,
+        highlighted_edges: Optional[Iterable[Tuple[Any, ...]]] = None,
         bottleneck_nodes: Optional[Iterable[Any]] = None,
         source_nodes: Optional[Iterable[Any]] = None,
         sink_nodes: Optional[Iterable[Any]] = None,
         layout: str = "physics",
+        presentation_mode: bool = False,
     ) -> Network:
         """
         Build a Pyvis network from a NetworkX graph.
-
-        Parameters
-        ----------
-        G : nx.DiGraph
-            Input supply chain graph.
-        node_size_by : str | None
-            Node attribute used to size nodes.
-            Example: "betweenness", "flow", "throughput", "fragility_score"
-        node_color_by : str
-            Coloring mode. Supported:
-            - "default"
-            - "node_type"
-            - "bottleneck"
-            - "fragility"
-            - "scenario_status"
-        edge_width_by : str | None
-            Edge attribute used to control edge thickness.
-            Example: "weight", "flow", "criticality"
-        show_node_labels : bool
-            Whether to show node labels.
-        show_edge_labels : bool
-            Whether to show edge labels.
-        failed_nodes : iterable
-            Nodes failed in the selected scenario.
-        failed_edges : iterable[(u, v)]
-            Edges failed in the selected scenario.
-        highlighted_nodes : iterable
-            Nodes to visually highlight.
-        highlighted_edges : iterable[(u, v)]
-            Edges to visually highlight.
-        bottleneck_nodes : iterable
-            Nodes identified as bottlenecks.
-        source_nodes : iterable
-            Source/supply nodes.
-        sink_nodes : iterable
-            Sink/demand nodes.
-        layout : str
-            "physics", "hierarchical", or "static"
         """
         failed_nodes_set = self._normalize_node_set(failed_nodes)
         failed_edges_set = self._normalize_edge_set(failed_edges)
@@ -127,11 +79,9 @@ class NetworkVisualizer:
 
         self._apply_layout_settings(net, layout=layout)
 
-        # Precompute scales
         node_sizes = self._compute_node_sizes(G, node_size_by=node_size_by)
         edge_widths = self._compute_edge_widths(G, edge_width_by=edge_width_by)
 
-        # Add nodes
         for node, attrs in G.nodes(data=True):
             node_color = self._resolve_node_color(
                 node=node,
@@ -143,11 +93,9 @@ class NetworkVisualizer:
                 sink_nodes=sink_nodes_set,
             )
 
-            border_width = 3 if node in highlighted_nodes_set else 1
-            shape = "dot"
-            size = node_sizes.get(node, 20)
-
-            label = str(attrs.get("label", node)) if show_node_labels else ""
+            border_width = 3 if str(node) in highlighted_nodes_set else 1
+            size = node_sizes.get(node, 20.0)
+            label = str(attrs.get("name", attrs.get("label", node))) if show_node_labels else ""
             title = self._build_node_tooltip(node=node, attrs=attrs)
 
             net.add_node(
@@ -156,38 +104,80 @@ class NetworkVisualizer:
                 title=title,
                 color=node_color,
                 size=size,
-                shape=shape,
+                shape="dot",
                 borderWidth=border_width,
             )
 
-        # Add edges
-        for u, v, attrs in G.edges(data=True):
-            edge_key = (str(u), str(v))
-            is_failed = edge_key in failed_edges_set
-            is_highlighted = edge_key in highlighted_edges_set
+        if G.is_multigraph():
+            for u, v, k, attrs in G.edges(keys=True, data=True):
+                edge_lookup_key = (str(u), str(v), str(k))
+                edge_uv_key = (str(u), str(v))
 
-            color = self.FAILED_EDGE_COLOR if is_failed else self.NORMAL_EDGE_COLOR
-            if is_highlighted and not is_failed:
-                color = self.HIGHLIGHT_EDGE_COLOR
+                is_failed = edge_lookup_key in failed_edges_set or edge_uv_key in failed_edges_set
+                is_highlighted = edge_lookup_key in highlighted_edges_set or edge_uv_key in highlighted_edges_set
 
-            width = edge_widths.get(edge_key, 2)
+                color = self.FAILED_EDGE_COLOR if is_failed else self.NORMAL_EDGE_COLOR
+                if is_highlighted and not is_failed:
+                    color = self.HIGHLIGHT_EDGE_COLOR
 
-            label = ""
-            if show_edge_labels:
-                label = self._resolve_edge_label(attrs)
+                width = edge_widths.get(edge_lookup_key, edge_widths.get(edge_uv_key, 2.0))
 
-            title = self._build_edge_tooltip(u=u, v=v, attrs=attrs)
+                if presentation_mode:
+                    if is_failed:
+                        width = max(width, 3.0)
+                    elif is_highlighted:
+                        width = max(width, 3.0)
+                    else:
+                        width = 1.0
+                        color = self.MUTED_EDGE_COLOR
 
-            net.add_edge(
-                str(u),
-                str(v),
-                label=label,
-                title=title,
-                color=color,
-                width=width,
-                arrows="to" if self.directed else "",
-                dashes=is_failed,
-            )
+                label = self._resolve_edge_label(attrs) if show_edge_labels else ""
+                title = self._build_edge_tooltip(u=u, v=v, attrs=attrs)
+
+                net.add_edge(
+                    str(u),
+                    str(v),
+                    label=label,
+                    title=title,
+                    color=color,
+                    width=width,
+                    arrows="to" if self.directed else "",
+                    dashes=is_failed,
+                )
+        else:
+            for u, v, attrs in G.edges(data=True):
+                edge_key = (str(u), str(v))
+                is_failed = edge_key in failed_edges_set
+                is_highlighted = edge_key in highlighted_edges_set
+
+                color = self.FAILED_EDGE_COLOR if is_failed else self.NORMAL_EDGE_COLOR
+                if is_highlighted and not is_failed:
+                    color = self.HIGHLIGHT_EDGE_COLOR
+
+                width = edge_widths.get(edge_key, 2.0)
+
+                if presentation_mode:
+                    if is_failed:
+                        width = max(width, 3.0)
+                    elif is_highlighted:
+                        width = max(width, 3.0)
+                    else:
+                        width = 1.0
+                        color = self.MUTED_EDGE_COLOR
+
+                label = self._resolve_edge_label(attrs) if show_edge_labels else ""
+                title = self._build_edge_tooltip(u=u, v=v, attrs=attrs)
+
+                net.add_edge(
+                    str(u),
+                    str(v),
+                    label=label,
+                    title=title,
+                    color=color,
+                    width=width,
+                    arrows="to" if self.directed else "",
+                    dashes=is_failed,
+                )
 
         return net
 
@@ -196,9 +186,6 @@ class NetworkVisualizer:
         net: Network,
         output_path: Optional[str | Path] = None,
     ) -> str:
-        """
-        Export the Pyvis network to HTML and return the HTML file path.
-        """
         if output_path is None:
             temp_dir = Path(tempfile.mkdtemp())
             output_path = temp_dir / "network_visualization.html"
@@ -214,16 +201,8 @@ class NetworkVisualizer:
         output_path: Optional[str | Path] = None,
         **kwargs: Any,
     ) -> str:
-        """
-        Convenience method:
-        build network -> export html -> return html path
-        """
         net = self.build_pyvis_network(G, **kwargs)
         return self.export_html(net, output_path=output_path)
-
-    # -------------------------------------------------------------------------
-    # Node styling
-    # -------------------------------------------------------------------------
 
     def _compute_node_sizes(
         self,
@@ -266,7 +245,7 @@ class NetworkVisualizer:
             return self.DEFAULT_NODE_COLOR
 
         if node_color_by == "node_type":
-            node_type = str(attrs.get("node_type", "")).lower()
+            node_type = str(attrs.get("type", attrs.get("node_type", ""))).lower()
             if node_str in source_nodes or node_type in {"source", "supplier", "origin"}:
                 return self.SOURCE_NODE_COLOR
             if node_str in sink_nodes or node_type in {"sink", "demand", "destination", "customer"}:
@@ -285,24 +264,28 @@ class NetworkVisualizer:
 
         return self.DEFAULT_NODE_COLOR
 
-    # -------------------------------------------------------------------------
-    # Edge styling
-    # -------------------------------------------------------------------------
-
     def _compute_edge_widths(
         self,
         G: nx.DiGraph,
         edge_width_by: Optional[str] = None,
         min_width: float = 1.0,
         max_width: float = 8.0,
-    ) -> Dict[Tuple[str, str], float]:
+    ) -> Dict[Any, float]:
         if not edge_width_by:
+            if G.is_multigraph():
+                return {(str(u), str(v), str(k)): 2.0 for u, v, k in G.edges(keys=True)}
             return {(str(u), str(v)): 2.0 for u, v in G.edges()}
 
-        values: Dict[Tuple[str, str], float] = {}
-        for u, v, attrs in G.edges(data=True):
-            raw = attrs.get(edge_width_by, 0.0)
-            values[(str(u), str(v))] = self._safe_float(raw, default=0.0)
+        values: Dict[Any, float] = {}
+
+        if G.is_multigraph():
+            for u, v, k, attrs in G.edges(keys=True, data=True):
+                raw = attrs.get(edge_width_by, 0.0)
+                values[(str(u), str(v), str(k))] = self._safe_float(raw, default=0.0)
+        else:
+            for u, v, attrs in G.edges(data=True):
+                raw = attrs.get(edge_width_by, 0.0)
+                values[(str(u), str(v))] = self._safe_float(raw, default=0.0)
 
         return self._scale_dict(values, out_min=min_width, out_max=max_width)
 
@@ -311,10 +294,6 @@ class NetworkVisualizer:
             if candidate in attrs:
                 return f"{candidate}: {attrs[candidate]}"
         return ""
-
-    # -------------------------------------------------------------------------
-    # Tooltips
-    # -------------------------------------------------------------------------
 
     def _build_node_tooltip(self, node: Any, attrs: Dict[str, Any]) -> str:
         lines = [f"<b>Node:</b> {node}"]
@@ -327,10 +306,6 @@ class NetworkVisualizer:
         for key, value in attrs.items():
             lines.append(f"<b>{key}:</b> {value}")
         return "<br>".join(lines)
-
-    # -------------------------------------------------------------------------
-    # Layout settings
-    # -------------------------------------------------------------------------
 
     def _apply_layout_settings(self, net: Network, layout: str = "physics") -> None:
         layout = (layout or "physics").lower()
@@ -381,6 +356,11 @@ class NetworkVisualizer:
             const options = {
               "physics": {
                 "enabled": true,
+                "stabilization": {
+                  "enabled": true,
+                  "iterations": 200,
+                  "updateInterval": 25
+                },
                 "barnesHut": {
                   "gravitationalConstant": -2000,
                   "centralGravity": 0.2,
@@ -399,10 +379,6 @@ class NetworkVisualizer:
             """
         )
 
-    # -------------------------------------------------------------------------
-    # Helpers
-    # -------------------------------------------------------------------------
-
     def _normalize_node_set(self, nodes: Optional[Iterable[Any]]) -> Set[str]:
         if not nodes:
             return set()
@@ -410,11 +386,20 @@ class NetworkVisualizer:
 
     def _normalize_edge_set(
         self,
-        edges: Optional[Iterable[Tuple[Any, Any]]],
-    ) -> Set[Tuple[str, str]]:
+        edges: Optional[Iterable[Tuple[Any, ...]]],
+    ) -> Set[Tuple[str, ...]]:
         if not edges:
             return set()
-        return {(str(u), str(v)) for u, v in edges}
+
+        normalized = set()
+        for edge in edges:
+            if len(edge) == 3:
+                u, v, k = edge
+                normalized.add((str(u), str(v), str(k)))
+            elif len(edge) == 2:
+                u, v = edge
+                normalized.add((str(u), str(v)))
+        return normalized
 
     def _safe_float(self, value: Any, default: float = 0.0) -> float:
         try:
@@ -446,9 +431,6 @@ class NetworkVisualizer:
         return scaled
 
     def _interpolate_red(self, score: float) -> str:
-        """
-        Convert a score in [0, 1] (or any number, clamped) to a red intensity scale.
-        """
         score = max(0.0, min(1.0, score))
         base_r, base_g, base_b = 255, 245, 240
         deep_r, deep_g, deep_b = 165, 15, 21

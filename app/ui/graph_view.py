@@ -141,8 +141,13 @@ def extract_rerouted_edges_from_flow_impact(flow_impact_df):
 
     edges = []
     for path_str in rerouted_df["final_path"].dropna().tolist():
-        nodes = [node.strip() for node in str(path_str).split("->")]
-        nodes = [node.strip() for node in nodes if node.strip()]
+        path_text = str(path_str)
+        if "→" in path_text:
+            nodes = [node.strip() for node in path_text.split("→")]
+        else:
+            nodes = [node.strip() for node in path_text.split("->")]
+
+        nodes = [node for node in nodes if node]
         if len(nodes) >= 2:
             for i in range(len(nodes) - 1):
                 edges.append((nodes[i], nodes[i + 1]))
@@ -199,6 +204,8 @@ def render_graph_tab(graph, node_result_df, controls):
     st.header("📡 Network Visualization")
     st.write("Interactive network graph with bottleneck, scenario, and cascade overlays.")
 
+    presentation_mode = controls.get("presentation_mode", False)
+
     scenario_node_summary_df = st.session_state.get("scenario_node_summary_df")
     scenario_edge_summary_df = st.session_state.get("scenario_edge_summary_df")
 
@@ -243,13 +250,15 @@ def render_graph_tab(graph, node_result_df, controls):
     route_node_ids = [str(x) for x in st.session_state.get("baseline_route_ids", [])]
     highlighted_edges = [(str(route_node_ids[i]), str(route_node_ids[i + 1])) for i in range(len(route_node_ids) - 1)]
 
-    # In cascade view, only show rerouted edges as active route overlays
     if overlay_mode == "Cascade View":
         combined_highlighted_edges = rerouted_edges
     else:
         combined_highlighted_edges = highlighted_edges
 
     combined_highlighted_edges = normalize_edges_for_visualization(combined_highlighted_edges)
+
+    if presentation_mode:
+        st.success("Presentation Mode is enabled: graph styling is simplified for demo clarity.")
 
     st.markdown("### Visualization Settings Summary")
     info_col1, info_col2, info_col3, info_col4 = st.columns(4)
@@ -281,6 +290,7 @@ def render_graph_tab(graph, node_result_df, controls):
             highlighted_nodes=route_node_ids,
             highlighted_edges=combined_highlighted_edges,
             bottleneck_nodes=bottleneck_nodes,
+            presentation_mode=controls.get("presentation_mode", False),
             layout=controls["layout_mode"],
         )
 
@@ -292,7 +302,11 @@ def render_graph_tab(graph, node_result_df, controls):
     except Exception as exc:
         st.error(f"Failed to render network visualization: {exc}")
 
-    st.markdown("### Overlay Details")
+    if presentation_mode:
+        st.markdown("### Key Overlay Highlights")
+    else:
+        st.markdown("### Overlay Details")
+
     detail_col1, detail_col2 = st.columns(2)
 
     with detail_col1:

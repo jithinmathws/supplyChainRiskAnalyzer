@@ -11,6 +11,7 @@ def test_load_graph_returns_directed_graph():
     assert graph.is_directed()
     assert graph.number_of_nodes() > 0
     assert graph.number_of_edges() > 0
+    assert graph.number_of_nodes() >= 2
 
 
 def test_node_options_are_non_empty():
@@ -24,6 +25,7 @@ def test_node_options_are_non_empty():
     assert isinstance(first_label, str)
     assert first_label != ""
     assert first_node_id is not None
+    assert first_node_id in graph.nodes
 
 
 def test_graph_signature_is_stable_for_same_graph():

@@ -8,7 +8,7 @@ class BottleneckDetector:
 
     def _to_weighted_digraph(self):
         """
-        Convert MultiDiGraph to DiGraph by keeping the fastest edge
+        Convert MultiDiGraph/DiGraph to DiGraph by keeping the fastest edge
         between each source-target pair.
         """
         reduced = nx.DiGraph()
@@ -16,35 +16,47 @@ class BottleneckDetector:
         for node, attrs in self.G.nodes(data=True):
             reduced.add_node(node, **attrs)
 
-        for u, v, key, data in self.G.edges(keys=True, data=True):
-            weight = data.get("transport_time", float("inf"))
+        if self.G.is_multigraph():
+            edge_iter = self.G.edges(keys=True, data=True)
+            for u, v, _, data in edge_iter:
+                weight = data.get("weight", data.get("transport_time", float("inf")))
 
-            if reduced.has_edge(u, v):
-                existing_weight = reduced[u][v]["transport_time"]
-                if weight < existing_weight:
-                    reduced[u][v].update(data)
-            else:
-                reduced.add_edge(u, v, **data)
+                if reduced.has_edge(u, v):
+                    existing_weight = reduced[u][v]["weight"]
+                    if weight < existing_weight:
+                        reduced[u][v].clear()
+                        reduced[u][v].update(data)
+                        reduced[u][v]["weight"] = weight
+                else:
+                    reduced.add_edge(u, v, **data)
+                    reduced[u][v]["weight"] = weight
+        else:
+            for u, v, data in self.G.edges(data=True):
+                weight = data.get("weight", data.get("transport_time", float("inf")))
+
+                if reduced.has_edge(u, v):
+                    existing_weight = reduced[u][v]["weight"]
+                    if weight < existing_weight:
+                        reduced[u][v].clear()
+                        reduced[u][v].update(data)
+                        reduced[u][v]["weight"] = weight
+                else:
+                    reduced.add_edge(u, v, **data)
+                    reduced[u][v]["weight"] = weight
 
         return reduced
 
     def _get_baseline_route(self, source_id, target_id):
-        """
-        Get the normal shortest route before any disruption.
-        """
         H = self._to_weighted_digraph()
         source_id = str(source_id)
         target_id = str(target_id)
 
-        path = nx.dijkstra_path(H, source_id, target_id, weight="transport_time")
-        total_time = nx.dijkstra_path_length(H, source_id, target_id, weight="transport_time")
+        path = nx.dijkstra_path(H, source_id, target_id, weight="weight")
+        total_time = nx.dijkstra_path_length(H, source_id, target_id, weight="weight")
 
         return path, total_time
 
     def _classify_impact(self, status, increase_ratio):
-        """
-        Convert disruption outcome into a human-readable impact category.
-        """
         if status == "Disconnected":
             return "Catastrophic"
         if increase_ratio is None:
@@ -56,9 +68,6 @@ class BottleneckDetector:
         return "Low Impact"
 
     def simulate_node_failure(self, disrupted_node, source_id, target_id):
-        """
-        Simulate failure of one node and evaluate rerouting impact.
-        """
         disrupted_node = str(disrupted_node)
         source_id = str(source_id)
         target_id = str(target_id)
@@ -119,13 +128,12 @@ class BottleneckDetector:
         H_removed.remove_node(disrupted_node)
 
         try:
-            new_path = nx.dijkstra_path(H_removed, source_id, target_id, weight="transport_time")
-            new_time = nx.dijkstra_path_length(H_removed, source_id, target_id, weight="transport_time")
+            new_path = nx.dijkstra_path(H_removed, source_id, target_id, weight="weight")
+            new_time = nx.dijkstra_path_length(H_removed, source_id, target_id, weight="weight")
             new_route_names = [H_removed.nodes[n].get("name", n) for n in new_path]
 
             increase = new_time - baseline_time
             increase_ratio = increase / baseline_time if baseline_time > 0 else 0.0
-            impact_category = self._classify_impact("Rerouted", increase_ratio)
 
             return {
                 "node_id": disrupted_node,
@@ -137,7 +145,7 @@ class BottleneckDetector:
                 "lead_time_increase": increase,
                 "increase_ratio": round(increase_ratio, 4),
                 "impact_score": round(increase_ratio, 4),
-                "impact_category": impact_category,
+                "impact_category": self._classify_impact("Rerouted", increase_ratio),
                 "new_route": " -> ".join(new_route_names),
             }
 
@@ -157,22 +165,15 @@ class BottleneckDetector:
             }
 
     def rank_node_bottlenecks(self, source_id, target_id, exclude_terminals=False):
-        """
-        Simulate disruption for every node and rank by impact.
-        """
         source_id = str(source_id)
         target_id = str(target_id)
 
         results = []
-
         for node_id in self.G.nodes():
             node_id = str(node_id)
-
             if exclude_terminals and node_id in {source_id, target_id}:
                 continue
-
-            result = self.simulate_node_failure(node_id, source_id, target_id)
-            results.append(result)
+            results.append(self.simulate_node_failure(node_id, source_id, target_id))
 
         df = pd.DataFrame(results)
 
@@ -186,55 +187,25 @@ class BottleneckDetector:
 
         df = df.sort_values(
             by=["status_priority", "impact_score", "lead_time_increase"],
-            ascending=[False, False, False]
+            ascending=[False, False, False],
         ).drop(columns=["status_priority"])
 
         return df.reset_index(drop=True)
 
     def summary_report(self, source_id, target_id, exclude_terminals=False):
-        """
-        Return a compact summary dictionary for reporting.
-        """
         df = self.rank_node_bottlenecks(
             source_id=source_id,
             target_id=target_id,
-            exclude_terminals=exclude_terminals
+            exclude_terminals=exclude_terminals,
         )
 
         disconnected_count = (df["status"] == "Disconnected").sum()
         rerouted_count = (df["status"] == "Rerouted").sum()
 
-        if not df.empty:
-            top_node = df.iloc[0]["node_name"]
-            top_status = df.iloc[0]["status"]
-        else:
-            top_node = None
-            top_status = None
-
         return {
             "total_nodes_evaluated": len(df),
             "disconnected_nodes": int(disconnected_count),
             "rerouted_nodes": int(rerouted_count),
-            "most_critical_node": top_node,
-            "most_critical_status": top_status,
+            "most_critical_node": df.iloc[0]["node_name"] if not df.empty else None,
+            "most_critical_status": df.iloc[0]["status"] if not df.empty else None,
         }
-
-
-if __name__ == "__main__":
-    from core.graph_builder import SupplyChainGraph
-
-    builder = SupplyChainGraph(
-        "data/nodes.csv",
-        ["data/edges.csv", "data/alternate_edges.csv"]
-    )
-    builder.load_data()
-    G = builder.build_graph()
-
-    detector = BottleneckDetector(G)
-
-    print("\n--- Node Bottleneck Ranking (excluding source/destination) ---")
-    result_df = detector.rank_node_bottlenecks("3", "5", exclude_terminals=True)
-    print(result_df.to_string(index=False))
-
-    print("\n--- Summary Report ---")
-    print(detector.summary_report("3", "5", exclude_terminals=True))

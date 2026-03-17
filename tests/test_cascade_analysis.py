@@ -19,6 +19,8 @@ def test_cascade_reroutes_flow_when_primary_hub_fails(small_supply_chain_graph):
     assert flow_result["baseline_cost"] == 2.0
     assert flow_result["final_cost"] == 4.0
     assert flow_result["cost_increase"] == 2.0
+    assert flow_result["delivered_demand"] == 10.0
+    assert flow_result["unmet_demand"] == 0.0
 
 
 def test_cascade_disrupts_flow_when_all_routes_fail(small_supply_chain_graph):
@@ -35,6 +37,7 @@ def test_cascade_disrupts_flow_when_all_routes_fail(small_supply_chain_graph):
     assert flow_result["status"] == "disrupted"
     assert flow_result["rerouted"] is False
     assert flow_result["baseline_path"] == ["A", "B", "D"]
+    assert flow_result["baseline_cost"] == 2.0
     assert flow_result["final_path"] is None
     assert flow_result["final_cost"] is None
     assert flow_result["delivered_demand"] == 0.0
