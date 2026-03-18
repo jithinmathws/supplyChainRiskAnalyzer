@@ -259,9 +259,21 @@ def load_uploaded_flows(flows_file):
     if missing:
         raise ValueError(f"Missing flows.csv columns: {sorted(missing)}")
 
+    if df.empty:
+        raise ValueError("flows.csv is empty.")
+
+    if df["source"].isna().any() or df["target"].isna().any():
+        raise ValueError("Flow source/target cannot be missing.")
+
     df["source"] = df["source"].astype(str).str.strip()
     df["target"] = df["target"].astype(str).str.strip()
     df["demand"] = pd.to_numeric(df["demand"], errors="raise")
+
+    if (df["source"] == "").any() or (df["target"] == "").any():
+        raise ValueError("Flow source/target cannot be blank.")
+
+    if (df["source"] == df["target"]).any():
+        raise ValueError("Flow source and target cannot be the same.")
 
     if (df["demand"] < 0).any():
         raise ValueError("Flow demand cannot be negative.")
