@@ -1,228 +1,305 @@
 # Validation Methodology
+
 ## Supply Chain Fragility & Risk Analyzer
 
-This document describes the validation methodology used to ensure that the Supply Chain Fragility & Risk Analyzer produces reliable and interpretable analytical results.
+This document describes how the Supply Chain Fragility & Risk Analyzer is validated to ensure correctness, consistency, and reliability of simulation outputs.
 
-Validation ensures that simulation outputs, network metrics, and disruption impact estimates accurately reflect expected topological and business behaviors in supply chain networks.
+The system follows a **deterministic, test-driven validation approach**, combining automated testing and manual verification of simulation behavior.
 
 ---
 
 # 1. Purpose of Validation
 
-The purpose of validation is to confirm that the system correctly models supply chain network behavior and produces meaningful disruption analysis.
+Validation ensures that:
 
-Validation focuses on verifying:
+* graph construction is correct
+* routing logic behaves as expected
+* disruption simulations produce consistent outcomes
+* cascade dynamics are realistic
+* business impact metrics are logically derived
 
-- Correctness of graph construction from raw datasets
-- Accuracy of network metric calculations
-- Consistency of disruption simulation results
-- Plausibility of routing and connectivity changes
-- Reliability of business impact estimations
-
-These checks help ensure that analytical outputs can be trusted for experimentation, decision-making, and supply chain risk analysis.
+The goal is **engineering reliability**, not predictive forecasting.
 
 ---
 
-# 2. Validation Strategy
+# 2. Validation Strategy Overview
 
-The system is validated using several complementary methods that test different components of the architecture.
+The system uses three complementary validation layers:
 
-Validation methods include:
+### 1. Automated Unit Testing (Primary)
 
-- Graph Structure Validation
-- Metric Verification
-- Simulation Consistency Testing
-- Scenario Validation
-- Sensitivity Analysis
+* deterministic pytest suite
+* covers core simulation logic
 
-Each method evaluates a specific layer of the analytical pipeline.
+### 2. Scenario-Based Validation
 
----
+* fixed test cases with known outcomes
+* validates rerouting and disruption behavior
 
-# 3. Graph Construction Validation
+### 3. UI-Level Validation
 
-The first validation step verifies that the supply chain network graph is correctly constructed from the dataset using the Graph Modeling Engine.
-
-Validation checks include:
-
-- Node count consistency
-- Edge connectivity validation
-- Absence of invalid node references
-- Correct edge directionality (ensuring logistics flows remain directed)
-
-### Core Validation Check
-
-
-Total Nodes in Dataset == G.number_of_nodes()
-Total Edges in Dataset == G.number_of_edges()
-
-
-Incorrect mappings or missing nodes at this stage will affect all downstream simulations and metric calculations.
+* manual verification via Streamlit dashboard
+* ensures correct presentation of KPIs and outputs
 
 ---
 
-# 4. Network Metric Validation
+# 3. Automated Test Suite (Pytest)
 
-The system computes several graph metrics commonly used in network science. These metrics are validated by comparing results against known theoretical expectations.
-
-| Metric | Validation Principle |
-|------|----------------------|
-| Degree Centrality | Highly connected logistics hubs should exhibit the highest degree values |
-| Betweenness Centrality | Critical transit nodes (such as major ports) should show high betweenness scores |
-| Shortest Path Length | Routing must minimize defined edge weights using Dijkstra's Algorithm |
-| Connected Components | Isolated supply chain clusters must appear as separate network components |
-
-These checks ensure the network analysis engine is functioning correctly.
+The project includes a **high-value test suite** covering core system components.
 
 ---
 
-# 5. Simulation Consistency Testing
+## 3.1 Graph Construction Validation
 
-Simulation consistency testing verifies that disruption experiments produce logically consistent outcomes based on network structure.
+File:
 
-### Expected System Behaviors
+```
+tests/test_graph_builder.py
+```
 
-- Removal of nodes reduces the Largest Connected Component (LCC)
-- Removal of central nodes increases average routing distances
-- Network fragmentation increases fragility scores
-- Traffic rerouting causes congestion shifts toward alternative routes
+Validates:
 
-### Example Test Execution
-
-1. Remove the node with the highest Betweenness Centrality
-2. Assert that network fragmentation increases
-3. Assert that Average Path Length (APL) increases
-4. Assert that the Fragility Score increases
-
-If these expected behaviors are not observed, the simulation engine requires further debugging.
+* nodes and edges are correctly loaded
+* graph structure matches dataset
+* invalid inputs are handled
 
 ---
 
-# 6. Scenario Validation
+## 3.2 Baseline Routing Validation
 
-The system is also validated using real-world inspired disruption scenarios.
+File:
 
-## Case A — Port Shutdown
+```
+tests/test_baseline_analysis.py
+```
 
-Simulates the closure of a major logistics hub.
+Validates:
 
-Expected results:
-
-- Routing detours increase average path length
-- Alternative ports experience increased betweenness centrality
-- Delivery delays increase
-
-## Case B — Regional Infrastructure Failure
-
-Simulates the disruption of multiple nodes within a region.
-
-Expected results:
-
-- Network fragmentation increases
-- Multiple congestion hotspots appear
-- The Largest Connected Component decreases significantly
-
-Scenario validation helps confirm that the system behaves realistically under stress conditions.
+* shortest path correctness
+* routing consistency
+* deterministic baseline outputs
 
 ---
 
-# 7. Sensitivity Analysis
+## 3.3 Cascade Simulation Validation
 
-Sensitivity analysis measures how strongly simulation results change when model parameters are modified.
+Files:
 
-### Parameters Tested
+```
+tests/test_cascade_simulator.py  
+tests/test_cascade_analysis.py
+```
 
-- Number of disrupted nodes
-- Network size and density
-- Routing distance weights
-- Transportation speed assumptions
+Validates:
 
-### Example Sensitivity Experiment
-
-Increase disrupted nodes from **1 → 5** and observe whether:
-
-- Network fragility increases
-- Average path length increases
-- Congestion shifts become more severe
-
-A stable analytical system should produce consistent patterns of increasing disruption impact.
+* rerouting when nodes fail
+* correct fallback path selection
+* cost and time recalculation
+* unmet demand handling
 
 ---
 
-# 8. Monte Carlo Validation
+### Example Assertion
 
-Repeated randomized simulations help evaluate the stability of the analytical model under uncertain conditions.
+```
+baseline_path = ["A", "B", "D"]
+final_path    = ["A", "C", "D"]
 
-Example configuration:
+assert rerouted == True
+assert cost_increase > 0
+```
 
-
-iterations = 1000
-
-
-### Procedure
-
-1. Randomly select disruption nodes
-2. Run the disruption simulation
-3. Compute network metrics
-4. Record fragility scores
-5. Repeat across iterations
-
-Statistical analysis of these runs helps identify:
-
-- consistently critical infrastructure nodes
-- high-risk regions in the network
-- systemic vulnerabilities
+This ensures the cascade engine behaves deterministically.
 
 ---
 
-# 9. Business Impact Validation
+# 4. Scenario-Based Validation
 
-The system translates structural network disruptions into operational metrics such as delivery delays and financial cost impacts.
-
-Validation ensures these translations remain logically consistent.
-
-### Validation Rules
-
-- Routing distance increases must correspond to increased delivery delays
-- Larger infrastructure disruptions must produce higher financial cost estimates
-- Output metrics should scale logically with disruption severity
-
-### Example Validation Logic
-
-
-Average Path Length increases by 20%
-→ Delivery delay increases
-→ Estimated cost impact increases
-
-
-This ensures that business-level outputs remain interpretable and consistent with network disruptions.
+The system is tested using **controlled graph fixtures**.
 
 ---
 
-# 10. Limitations of Validation
+## Example Scenario
 
-Validation in this system focuses on structural and simulation correctness rather than real-world predictive forecasting.
+* Graph:
+  A → B → D
+  A → C → D
 
-Known limitations include:
+* Disruption:
+  Node B removed
 
-- Simplified supply chain network representations
-- Limited access to proprietary real-world logistics datasets
-- Estimated cost and delay parameters
+---
 
-Despite these limitations, the validation methodology ensures that the analytical framework behaves consistently with established network science principles.
+### Expected Behavior
+
+* baseline path: A → B → D
+* rerouted path: A → C → D
+* cost increases
+* demand still delivered
+
+---
+
+This validates:
+
+* rerouting logic
+* fallback path discovery
+* cost computation
+
+---
+
+# 5. Cascade Simulation Validation
+
+The cascade engine is validated against expected system dynamics:
+
+---
+
+## Expected Behaviors
+
+* disrupted routes trigger rerouting
+* overloaded edges are removed
+* failures propagate step-by-step
+* system stabilizes within max_steps
+
+---
+
+## Step-Level Validation
+
+The simulator produces:
+
+* routed demand
+* disrupted demand
+* failed nodes/edges
+
+Validation ensures:
+
+* monotonic failure accumulation
+* consistent demand accounting
+* no negative or invalid values
+
+---
+
+# 6. Business Metric Validation
+
+The system translates simulation outputs into KPIs.
+
+---
+
+## Validation Rules
+
+* rerouting → increases cost
+* longer paths → increase delay
+* unmet demand → increases loss
+
+---
+
+## Example Logic
+
+```
+if final_cost > baseline_cost:
+    reroute_cost > 0
+```
+
+```
+if unmet_demand > 0:
+    unmet_demand_loss > 0
+```
+
+---
+
+# 7. UI-Level Validation (Streamlit)
+
+Manual validation is performed through the dashboard.
+
+---
+
+## Verified Components
+
+### KPI Cards
+
+* service level
+* unmet demand
+* failed nodes/edges
+* economic impact
+
+---
+
+### Flow Impact Table
+
+* baseline vs final path
+* cost/time increase
+* rerouting flag
+* demand delivery
+
+---
+
+### Step Metrics Table
+
+* cascade progression
+* demand tracking
+* failure accumulation
+
+---
+
+## Validation Goal
+
+Ensure:
+
+* values match backend simulation
+* no inconsistencies across views
+* metrics update correctly per scenario
+
+---
+
+# 8. Deterministic Behavior Guarantee
+
+The system is designed to be **fully deterministic**:
+
+* no randomness in simulations
+* same input → same output
+* reproducible test cases
+
+This ensures:
+
+* reliable debugging
+* consistent analysis results
+
+---
+
+# 9. Limitations of Validation
+
+The validation approach focuses on **correctness of implementation**, not real-world prediction.
+
+Limitations include:
+
+* synthetic datasets
+* simplified economic models
+* no probabilistic behavior
+
+---
+
+# 10. Future Validation Extensions
+
+Planned improvements:
+
+* Monte Carlo simulations
+* probabilistic disruption modeling
+* sensitivity analysis
+* real-world dataset benchmarking
 
 ---
 
 # 11. Summary
 
-The validation framework ensures that the Supply Chain Fragility & Risk Analyzer produces reliable and interpretable simulation results.
+The validation methodology combines:
 
-The methodology combines:
+* deterministic unit testing
+* scenario-based verification
+* UI validation
 
-- graph integrity checks
-- network metric verification
-- disruption scenario testing
-- sensitivity analysis
-- repeated Monte Carlo simulations
+This ensures that the system:
 
-Together, these techniques provide strong confidence that the system correctly models disruption dynamics within supply chain networks.
+* behaves consistently
+* produces interpretable outputs
+* correctly models disruption dynamics
+
+The result is a **robust, test-driven simulation framework** for supply chain fragility analysis.

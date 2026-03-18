@@ -7,15 +7,17 @@ class CascadeSimulator:
     """
     Capacity-aware cascading disruption simulator.
 
-    Phase 2 logic:
+    Current logic:
     - Apply initial node/edge shocks
     - Recompute shortest paths for demand flows
-    - Accumulate edge loads
+    - Accumulate edge and node loads
     - Remove overloaded edges
+    - Remove overloaded nodes
+    - Remove isolated nodes
     - Repeat until stable or max_steps reached
 
     Flow Impact Tracking:
-    - Capture baseline path/cost/hops for each flow
+    - Capture baseline path/cost/time/hops for each flow
     - Compare final surviving path against baseline
     - Mark each flow as delivered, rerouted, or disrupted
 
@@ -55,8 +57,11 @@ class CascadeSimulator:
 
     def _initialize_graph_attributes(self, G):
         """
-        Ensure every edge has required attributes.
+        Ensure every node/edge has required attributes.
         """
+        for _, data in G.nodes(data=True):
+            data.setdefault("capacity", self.default_capacity)
+
         if G.is_multigraph():
             for _, _, _, data in G.edges(keys=True, data=True):
                 data.setdefault("capacity", self.default_capacity)
@@ -189,7 +194,7 @@ class CascadeSimulator:
     # --------------------------------------------------
 
     def _run_single_step(self, flows, step):
-        self._reset_edge_loads()
+        self._reset_loads()
 
         routed_flows = []
         disrupted_flows = []
@@ -233,29 +238,16 @@ class CascadeSimulator:
                 }
             )
 
-        edge_loads_snapshot = {}
-
-        if self.G.is_multigraph():
-            for u, v, k, data in self.G.edges(keys=True, data=True):
-                load = data.get("load", 0.0)
-                capacity = data.get("capacity", self.default_capacity)
-                edge_loads_snapshot[(u, v, k)] = {
-                    "load": load,
-                    "capacity": capacity,
-                    "utilization": load / capacity if capacity > 0 else None,
-                }
-        else:
-            for u, v, data in self.G.edges(data=True):
-                load = data.get("load", 0.0)
-                capacity = data.get("capacity", self.default_capacity)
-                edge_loads_snapshot[(u, v)] = {
-                    "load": load,
-                    "capacity": capacity,
-                    "utilization": load / capacity if capacity > 0 else None,
-                }
+        edge_loads_snapshot = self._build_edge_load_snapshot()
+        node_loads_snapshot = self._build_node_load_snapshot()
 
         new_failed_edges = self._fail_overloaded_edges()
-        new_failed_nodes = self._fail_isolated_nodes()
+        new_failed_nodes_from_capacity = self._fail_overloaded_nodes()
+        new_failed_nodes_from_isolation = self._fail_isolated_nodes()
+
+        new_failed_nodes = new_failed_nodes_from_capacity + [
+            node for node in new_failed_nodes_from_isolation if node not in new_failed_nodes_from_capacity
+        ]
 
         routed_demand = float(sum(flow["demand"] for flow in routed_flows))
         disrupted_demand = float(sum(flow["demand"] for flow in disrupted_flows))
@@ -267,6 +259,8 @@ class CascadeSimulator:
             "disrupted_demand": disrupted_demand,
             "new_failed_edge_count": len(new_failed_edges),
             "new_failed_node_count": len(new_failed_nodes),
+            "new_overloaded_node_count": len(new_failed_nodes_from_capacity),
+            "new_isolated_node_count": len(new_failed_nodes_from_isolation),
             "cumulative_failed_edge_count": len(self.failed_edges),
             "cumulative_failed_node_count": len(self.failed_nodes),
             "active_edge_count": self.G.number_of_edges(),
@@ -279,13 +273,19 @@ class CascadeSimulator:
             "disrupted_flows": disrupted_flows,
             "new_failed_edges": new_failed_edges,
             "new_failed_nodes": new_failed_nodes,
+            "new_failed_nodes_from_capacity": new_failed_nodes_from_capacity,
+            "new_failed_nodes_from_isolation": new_failed_nodes_from_isolation,
             "all_failed_edges": sorted(self.failed_edges),
             "all_failed_nodes": sorted(self.failed_nodes),
             "edge_loads": edge_loads_snapshot,
+            "node_loads": node_loads_snapshot,
             "step_metrics": step_metrics,
         }
 
-    def _reset_edge_loads(self):
+    def _reset_loads(self):
+        for node in self.G.nodes():
+            self.G.nodes[node]["load"] = 0.0
+
         if self.G.is_multigraph():
             for u, v, k in self.G.edges(keys=True):
                 self.G[u][v][k]["load"] = 0.0
@@ -294,6 +294,9 @@ class CascadeSimulator:
                 self.G[u][v]["load"] = 0.0
 
     def _assign_flow_to_path(self, path, demand):
+        for node in path:
+            self.G.nodes[node]["load"] = float(self.G.nodes[node].get("load", 0.0)) + demand
+
         for u, v in zip(path[:-1], path[1:]):
             if self.G.is_multigraph():
                 best_key = min(
@@ -303,6 +306,44 @@ class CascadeSimulator:
                 self.G[u][v][best_key]["load"] += demand
             else:
                 self.G[u][v]["load"] += demand
+
+    def _build_edge_load_snapshot(self):
+        edge_loads_snapshot = {}
+
+        if self.G.is_multigraph():
+            for u, v, k, data in self.G.edges(keys=True, data=True):
+                load = float(data.get("load", 0.0))
+                capacity = float(data.get("capacity", self.default_capacity))
+                edge_loads_snapshot[(u, v, k)] = {
+                    "load": load,
+                    "capacity": capacity,
+                    "utilization": load / capacity if capacity > 0 else None,
+                }
+        else:
+            for u, v, data in self.G.edges(data=True):
+                load = float(data.get("load", 0.0))
+                capacity = float(data.get("capacity", self.default_capacity))
+                edge_loads_snapshot[(u, v)] = {
+                    "load": load,
+                    "capacity": capacity,
+                    "utilization": load / capacity if capacity > 0 else None,
+                }
+
+        return edge_loads_snapshot
+
+    def _build_node_load_snapshot(self):
+        node_loads_snapshot = {}
+
+        for node, data in self.G.nodes(data=True):
+            load = float(data.get("load", 0.0))
+            capacity = float(data.get("capacity", self.default_capacity))
+            node_loads_snapshot[node] = {
+                "load": load,
+                "capacity": capacity,
+                "utilization": load / capacity if capacity > 0 else None,
+            }
+
+        return node_loads_snapshot
 
     def _fail_overloaded_edges(self):
         overloaded = []
@@ -329,6 +370,22 @@ class CascadeSimulator:
                 if self.G.has_edge(u, v):
                     self.G.remove_edge(u, v)
                     self.failed_edges.add((u, v))
+
+        return overloaded
+
+    def _fail_overloaded_nodes(self):
+        overloaded = []
+
+        for node, data in list(self.G.nodes(data=True)):
+            load = float(data.get("load", 0.0))
+            capacity = float(data.get("capacity", self.default_capacity))
+            if load > capacity:
+                overloaded.append(node)
+
+        for node in overloaded:
+            if self.G.has_node(node):
+                self.G.remove_node(node)
+                self.failed_nodes.add(node)
 
         return overloaded
 
@@ -421,6 +478,8 @@ class CascadeSimulator:
                     "disrupted_demand": float(metrics.get("disrupted_demand", 0.0)),
                     "new_failed_edge_count": metrics.get("new_failed_edge_count", 0),
                     "new_failed_node_count": metrics.get("new_failed_node_count", 0),
+                    "new_overloaded_node_count": metrics.get("new_overloaded_node_count", 0),
+                    "new_isolated_node_count": metrics.get("new_isolated_node_count", 0),
                     "cumulative_failed_edge_count": metrics.get("cumulative_failed_edge_count", 0),
                     "cumulative_failed_node_count": metrics.get("cumulative_failed_node_count", 0),
                     "active_edge_count": metrics.get("active_edge_count", 0),
@@ -446,6 +505,9 @@ class CascadeSimulator:
                     "baseline_cost": item.get("baseline_cost"),
                     "final_cost": item.get("final_cost"),
                     "cost_increase": item.get("cost_increase"),
+                    "baseline_time": item.get("baseline_time"),
+                    "final_time": item.get("final_time"),
+                    "time_increase": item.get("time_increase"),
                     "baseline_hops": item.get("baseline_hops"),
                     "final_hops": item.get("final_hops"),
                     "hop_increase": item.get("hop_increase"),
@@ -479,6 +541,21 @@ class CascadeSimulator:
 
         return total_cost
 
+    def _compute_path_time(self, graph, path):
+        if not path or len(path) < 2:
+            return 0.0
+
+        total_time = 0.0
+
+        for u, v in zip(path[:-1], path[1:]):
+            if graph.is_multigraph():
+                best_time = min(graph[u][v][k].get("weight", self.default_weight) for k in graph[u][v])
+                total_time += float(best_time)
+            else:
+                total_time += float(graph[u][v].get("weight", self.default_weight))
+
+        return total_time
+
     def _build_baseline_flow_map(self, flows):
         baseline_map = {}
 
@@ -496,6 +573,7 @@ class CascadeSimulator:
                     weight="weight",
                 )
                 baseline_cost = self._compute_path_cost(self.original_graph, baseline_path)
+                baseline_time = self._compute_path_time(self.original_graph, baseline_path)
                 baseline_hops = max(len(baseline_path) - 1, 0)
 
                 baseline_map[flow_key] = {
@@ -504,6 +582,7 @@ class CascadeSimulator:
                     "demand": demand,
                     "baseline_path": baseline_path,
                     "baseline_cost": baseline_cost,
+                    "baseline_time": baseline_time,
                     "baseline_hops": baseline_hops,
                 }
             except (nx.NetworkXNoPath, nx.NodeNotFound):
@@ -513,6 +592,7 @@ class CascadeSimulator:
                     "demand": demand,
                     "baseline_path": None,
                     "baseline_cost": None,
+                    "baseline_time": None,
                     "baseline_hops": None,
                 }
 
@@ -530,10 +610,12 @@ class CascadeSimulator:
             baseline = baseline_map.get(flow_key, {})
             baseline_path = baseline.get("baseline_path")
             baseline_cost = baseline.get("baseline_cost")
+            baseline_time = baseline.get("baseline_time")
             baseline_hops = baseline.get("baseline_hops")
 
             final_path = None
             final_cost = None
+            final_time = None
             final_hops = None
             status = "disrupted"
             rerouted = False
@@ -543,6 +625,7 @@ class CascadeSimulator:
                 try:
                     final_path = nx.shortest_path(self.G, source, target, weight="weight")
                     final_cost = self._compute_path_cost(self.G, final_path)
+                    final_time = self._compute_path_time(self.G, final_path)
                     final_hops = max(len(final_path) - 1, 0)
                     delivered_demand = demand
 
@@ -558,13 +641,15 @@ class CascadeSimulator:
                     status = "disrupted"
 
             cost_increase = final_cost - baseline_cost if baseline_cost is not None and final_cost is not None else None
+            time_increase = final_time - baseline_time if baseline_time is not None and final_time is not None else None
             hop_increase = final_hops - baseline_hops if baseline_hops is not None and final_hops is not None else None
             unmet_demand = demand - delivered_demand
 
             positive_cost_increase = max(float(cost_increase or 0.0), 0.0)
+            positive_time_increase = max(float(time_increase or 0.0), 0.0)
 
             reroute_cost = positive_cost_increase * self.reroute_cost_rate * delivered_demand
-            delay_penalty = positive_cost_increase * self.delay_penalty_rate * delivered_demand
+            delay_penalty = positive_time_increase * self.delay_penalty_rate * delivered_demand
             unmet_demand_loss = unmet_demand * self.unmet_demand_loss_rate
             total_economic_impact = reroute_cost + delay_penalty + unmet_demand_loss
 
@@ -580,6 +665,9 @@ class CascadeSimulator:
                     "baseline_cost": baseline_cost,
                     "final_cost": final_cost,
                     "cost_increase": cost_increase,
+                    "baseline_time": baseline_time,
+                    "final_time": final_time,
+                    "time_increase": time_increase,
                     "baseline_hops": baseline_hops,
                     "final_hops": final_hops,
                     "hop_increase": hop_increase,

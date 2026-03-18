@@ -2,65 +2,85 @@
 
 ## Supply Chain Fragility & Risk Analyzer
 
-This document describes the system architecture of the **Supply Chain Fragility & Risk Analyzer**. The system models supply chain networks as graphs and evaluates how disruptions propagate through logistics infrastructure.
+This document describes the architecture of the **Supply Chain Fragility & Risk Analyzer**, a **graph-based digital twin system** for modeling supply chain networks and simulating disruption-driven fragility.
 
-The architecture supports modular development of graph modeling, network analysis, dynamic disruption simulation ("What-If Engine"), and business-centric visualization capabilities.
+The platform models logistics systems as **directed multi-route graphs** and evaluates how disruptions propagate through infrastructure using:
+
+* scenario-based simulation
+* capacity-aware cascading failures
+* **time-based delay modeling**
+* **economic impact translation**
+
+The system follows a **layered, modular architecture** built around a shared NetworkX graph model and supports interactive analysis through a Streamlit-based UI.
 
 ---
 
 # 1. Architectural Overview
 
-The system follows a **Layered Analytical Pipeline Architecture**, where each stage processes and transforms a network representation of the supply chain.
+The system follows a **Layered Analytical Pipeline Architecture**, where each stage transforms a shared network representation into progressively higher-level insights.
 
-The architecture is also **data-centric**, with the **NetworkX graph object acting as the central shared data structure** between modules.
-
-The core workflow of the system is:
+The central data structure is a:
 
 ```
-Dataset (CSV / OSMnx)
-        ↓
-Graph Construction
-        ↓
-Network Analysis
-        ↓
-Disruption Simulation
-        ↓
-Business Impact Translation
-        ↓
-Visualization
+NetworkX MultiDiGraph
 ```
 
-Each stage is implemented as an independent module that interacts through clearly defined interfaces.
+This enables:
+
+* multiple parallel routes
+* attribute-rich edges (time, cost, capacity)
+* realistic logistics modeling
+
+---
+
+## Core Workflow
+
+```
+CSV Dataset  
+     ↓  
+Graph Construction  
+     ↓  
+Baseline Network Analysis  
+     ↓  
+Scenario Analysis  
+     ↓  
+Cascade Simulation  
+     ↓  
+Business Impact Engine  
+     ↓  
+Interactive Dashboard  
+```
+
+Each stage is **loosely coupled**, allowing independent extension and testing.
 
 ---
 
 # 2. High-Level Architecture
 
-The system is divided into six primary layers.
-
 ```
-+------------------------------------------------+
-|                Visualization Layer             |
-|    (Streamlit + Plotly + Congestion Heatmaps)  |
-+------------------------------------------------+
-|       Business Metric Translation Engine       |
-|      (Translating Graph Metrics → Business)    |
-+------------------------------------------------+
-|               Simulation Engine                |
-|  (Ripple Effect & Disruption Scenario Models)  |
-+------------------------------------------------+
-|              Network Analysis Engine           |
-|   (Centrality, Shortest Paths, Connectivity)   |
-+------------------------------------------------+
-|              Graph Modeling Engine             |
-|   (Network Construction using nx.DiGraph)      |
-+------------------------------------------------+
-|                   Data Layer                   |
-|      (CSV Loaders + OSMnx Geospatial APIs)     |
-+------------------------------------------------+
++--------------------------------------------------+
+|               Application Layer                  |
+|     (Streamlit UI + Service Abstraction Layer)  |
++--------------------------------------------------+
+|             Visualization Layer                 |
+|        (KPIs, Tables, Network Graphs)           |
++--------------------------------------------------+
+|         Business Impact Engine                  |
+|   (Cost, Delay, Service-Level Modeling)         |
++--------------------------------------------------+
+|             Simulation Engine                   |
+|    (Scenario Engine + Cascade Simulator)        |
++--------------------------------------------------+
+|           Network Analysis Engine               |
+|   (Routing, Connectivity, Fragility Metrics)    |
++--------------------------------------------------+
+|            Graph Modeling Engine                |
+|     (MultiDiGraph Construction & Validation)    |
++--------------------------------------------------+
+|                  Data Layer                     |
+|               (Structured CSV)                  |
++--------------------------------------------------+
 ```
-
-Each layer is responsible for a specific stage in the supply chain analysis pipeline.
 
 ---
 
@@ -68,74 +88,63 @@ Each layer is responsible for a specific stage in the supply chain analysis pipe
 
 ## Responsibilities
 
-The Data Layer is responsible for loading and validating supply chain datasets, including both structured tabular data and real-world infrastructure graphs.
+The Data Layer loads, validates, and normalizes structured datasets representing supply chain infrastructure.
 
 ---
 
-## Input Data Sources
+## Supported Inputs
 
-The system supports two primary data pipelines.
+### Nodes (`nodes.csv`)
 
-### 1. Structured CSV Data
+Defines supply chain entities:
 
-Used to model logical supply chain relationships.
+* suppliers
+* factories
+* ports
+* warehouses
+* distribution hubs
 
-**nodes.csv**
-
-Defines supply chain entities.
-
-Example fields:
-
-```
-node_id
-node_type
-capacity
-location
-country
-```
-
-Node types may include:
-
-* Supplier
-* Factory
-* Port
-* Warehouse
-* Distribution Center
-
-**edges.csv**
-
-Defines relationships between entities.
-
-Example fields:
+**Core fields:**
 
 ```
-source
-target
-transport_type
-distance
-cost
-transit_time
+node_id, name, type, location, capacity
+```
+
+**Optional fields:**
+
+```
+tier, region, recovery_time, criticality
 ```
 
 ---
 
-### 2. Geospatial Infrastructure Data (OSMnx)
+### Edges (`edges.csv`, `alternate_edges.csv`)
 
-The system can dynamically retrieve infrastructure networks from **OpenStreetMap** using OSMnx.
+Defines logistics relationships between nodes.
 
-Examples:
+**Core fields:**
 
-* road networks around industrial hubs
-* port logistics regions
-* rail infrastructure networks
+```
+source, target, transport_mode, distance, transport_time
+```
 
-Example locations:
+**Optional fields:**
 
-* Port of Long Beach
-* Rotterdam logistics network
-* Ruhr industrial region
+```
+capacity, cost, reliability, recovery_time
+```
 
-This allows the system to analyze **real-world transport infrastructure**.
+---
+
+## Validation Pipeline
+
+The system performs:
+
+* schema validation
+* type normalization
+* duplicate detection
+* missing value handling
+* graph consistency checks
 
 ---
 
@@ -143,57 +152,47 @@ This allows the system to analyze **real-world transport infrastructure**.
 
 ## Responsibilities
 
-The Graph Modeling Engine converts dataset inputs into a **directed supply chain network**.
+Transforms structured data into a **directed supply chain network**.
 
 ---
 
 ## Graph Representation
 
-The system uses the **NetworkX DiGraph structure** to enforce directional logistics flow.
-
-Example:
-
 ```
-G = nx.DiGraph()
-
-G.add_node(node_id, type="port", country="Singapore")
-
-G.add_edge(source, target, transport="sea", distance=1200)
+nx.MultiDiGraph
 ```
+
+Supports:
+
+* multiple parallel routes
+* different transport modes
+* redundancy modeling
 
 ---
 
-## Core Data Structure
+## Core Data Model
 
-The **NetworkX DiGraph object acts as the central system data model**.
-
-All modules operate on the same graph instance.
+The graph acts as the **shared state across all modules**.
 
 ### Node Attributes
 
-Nodes may include attributes such as:
+* type
+* capacity
+* location
+* tier
+* recovery_time
 
-```
-type
-capacity
-location
-country
-risk_score
-```
+---
 
 ### Edge Attributes
 
-Edges may include attributes such as:
+* transport_mode
+* distance
+* **weight (time / lead time)**
+* capacity
+* cost
 
-```
-transport_type
-distance
-cost
-transit_time
-congestion_factor
-```
-
-This graph becomes the **primary data structure used by all downstream modules**.
+> ⚠️ The `weight` attribute represents **time**, not hops — enabling realistic delay modeling.
 
 ---
 
@@ -201,186 +200,160 @@ This graph becomes the **primary data structure used by all downstream modules**
 
 ## Responsibilities
 
-The Network Analysis Engine computes structural properties of the supply chain network to identify critical nodes, bottlenecks, and structural vulnerabilities.
+Computes baseline structural and routing properties.
 
 ---
 
-## Key Metrics
+## Core Functions
 
-### Degree Centrality
+### Shortest Path Routing
 
-Identifies highly connected logistics hubs.
+Uses:
 
 ```
-nx.degree_centrality(G)
+Dijkstra Algorithm (weight = time)
 ```
+
+Enables:
+
+* fastest path selection
+* delay-aware rerouting
+* realistic logistics behavior
 
 ---
 
-### Betweenness Centrality
+### Fragility Indicators
 
-Identifies nodes that act as **critical transit bridges** in the network.
-
-These nodes often represent:
-
-* ports
-* distribution hubs
-* logistics gateways
-
-During simulations, this metric is **recalculated dynamically** to identify new congestion points.
-
-```
-nx.betweenness_centrality(G)
-```
+* connectivity loss
+* alternative path availability
+* rerouting feasibility
+* lead-time increase
 
 ---
 
-### Shortest Path Analysis
+# 6. Simulation Engine
 
-The system uses **Dijkstra’s Algorithm** to identify optimal routes based on edge weights such as:
-
-* distance
-* transit time
-* cost
-
-```
-nx.shortest_path(G, weight="distance")
-```
+The Simulation Engine contains two major components:
 
 ---
 
-### Connectivity Metrics
+## 6.1 Scenario Analysis Engine
 
-Additional structural indicators include:
+Evaluates disruption scenarios across multiple flows.
 
-* number of connected components
-* network density
-* average path length
-* network diameter
+### Capabilities
 
-These metrics quantify overall network resilience.
+* multi-flow simulation
+* node and edge disruption modeling
+* rerouting feasibility analysis
+* impact aggregation
+
+### Outputs
+
+* bottleneck rankings
+* disruption classifications
+* delay and cost changes
 
 ---
 
-# 6. Simulation Engine (The "What-If" Engine)
+## 6.2 Cascade Simulator (Capacity-Aware)
+
+Models **dynamic cascading failures**.
+
+---
+
+### Core Algorithm
+
+1. Apply initial disruptions
+2. Recompute shortest paths
+3. Route demand flows
+4. Accumulate edge loads
+5. Remove overloaded edges
+6. Repeat until stable
+
+---
+
+### Real-World Effects Captured
+
+* congestion spillover
+* infrastructure overload
+* secondary failures
+* network fragmentation
+
+---
+
+## Cascade Outputs
+
+### Flow-Level Metrics
+
+* baseline vs final path
+* rerouting status
+* delivered vs unmet demand
+* **time increase (delay)**
+* cost increase
+* hop change
+
+---
+
+### System-Level Metrics
+
+* service level
+* disrupted flows
+* unmet demand
+* total economic impact
+
+---
+
+### Step-Level Metrics
+
+* routed demand per step
+* new failures per step
+* cumulative failures
+
+---
+
+# 7. Business Impact Engine
 
 ## Responsibilities
 
-The Simulation Engine models disruption scenarios and evaluates how failures propagate through the supply chain network.
-
-The engine allows users to test **hypothetical disruption scenarios** and observe how the network responds.
+Translates simulation results into **decision-ready KPIs**.
 
 ---
 
-## Types of Simulations
+## Economic Model
 
-### Targeted Attack
-
-Removes nodes based on importance metrics.
-
-Example:
-
-* removing the top 5 ports by Betweenness Centrality
-
-This simulates events such as:
-
-* major port shutdown
-* geopolitical trade disruption
-* infrastructure failure
-
----
-
-### Random Failure
-
-Randomly removes nodes or edges.
-
-Used to simulate:
-
-* natural disasters
-* accidents
-* unexpected supplier failures
-
----
-
-### Ripple Effect Simulator (Cascading Failures)
-
-Models **secondary disruptions caused by rerouting and congestion**.
-
-Procedure:
-
-1. Remove a critical node
-2. Recalculate shortest paths
-3. Recompute centrality metrics
-4. Detect newly overloaded nodes
-
-This identifies **emergent bottlenecks** created by disruption.
-
-After each disruption event, the system recomputes:
-
-* centrality metrics
-* shortest paths
-* connectivity metrics
-
-This captures **dynamic topology changes** in the supply chain network.
-
----
-
-# 7. Business Metric Translation Engine
-
-## Responsibilities
-
-This module translates raw graph metrics into **business-relevant insights**.
-
-Graph metrics alone are difficult for decision-makers to interpret.
-This layer converts structural changes in the network into **economic and operational impacts**.
-
----
-
-## Key Outputs
-
-### Lead Time Impact
-
-Increased path lengths translate into delivery delays.
-
-Approximate model:
+### Reroute Cost
 
 ```
-Lead Time Increase ≈ Δ(Average Path Length) × Average Transit Time per Edge
+(cost increase × demand × reroute_cost_rate)
 ```
 
-Example output:
+### Delay Penalty
 
 ```
-+14 Days Transit Delay
+(time increase × demand × delay_penalty_rate)
+```
+
+### Unmet Demand Loss
+
+```
+(unmet demand × unmet_demand_loss_rate)
 ```
 
 ---
 
-### Cost Equivalents
+## Aggregate Outputs
 
-Delays are translated into financial estimates.
-
-Approximate model:
-
-```
-Estimated Cost Impact ≈ Delay Days × Daily Throughput Value
-```
-
-Example:
-
-```
-$1.2M daily delay cost
-```
+* total economic impact
+* service level
+* unmet demand
+* disruption ratio
 
 ---
 
-### Operational Risk Indicators
+## Key Insight
 
-Additional indicators may include:
-
-* congestion risk scores
-* route redundancy levels
-* infrastructure criticality ranking
+> The system bridges **network-level disruption** with **business-level consequences**, making it usable beyond pure graph analysis.
 
 ---
 
@@ -388,157 +361,136 @@ Additional indicators may include:
 
 ## Responsibilities
 
-The Visualization Layer presents network structures, disruption simulations, and business impacts interactively.
+Transforms analytical outputs into interactive insights.
 
 ---
 
 ## Technologies
 
-* Plotly
 * Streamlit
+* Plotly
 
 ---
 
 ## Capabilities
 
-### Network Graph Visualization
+### KPI Dashboard
 
-Displays supply chain topology and node importance.
-
----
-
-### Congestion Heatmaps
-
-Visualizes ripple effects from disruptions.
-
-Newly overloaded routes are highlighted in red.
+* service level
+* economic impact
+* disruption metrics
 
 ---
 
-### Interactive Dashboards
+### Analytical Tables
 
-Users can simulate disruptions by interacting with the network:
-
-Example:
-
-* select a node
-* simulate failure
-* observe changes in routes and business metrics
-
-The system updates results **in real time**.
+* flow impact tables
+* cascade step metrics
+* bottleneck rankings
 
 ---
 
-# 9. System Execution Pipeline
+### Network Visualization
 
-The system executes the following workflow:
+* topology display
+* disruption highlighting
+* fragility overlays
+
+---
+
+# 9. Application Layer (Streamlit)
+
+## Responsibilities
+
+Provides an interactive simulation environment.
+
+---
+
+## Architecture
+
+* service-layer abstraction
+* modular UI components
+* session state management
+
+---
+
+## UI Modules
+
+* Node Analysis
+* Edge Analysis
+* Scenario Analysis
+* Cascade Simulation
+* Network Visualization
+
+---
+
+## User Capabilities
+
+* define flows
+* simulate disruptions
+* analyze cascading effects
+* evaluate economic impact
+
+---
+
+# 10. Module Interaction Flow
 
 ```
-Load Dataset
-      ↓
-Construct Graph
-      ↓
-Compute Baseline Metrics
-      ↓
-Run Disruption Simulation
-      ↓
-Recalculate Network Metrics
-      ↓
-Translate Graph Metrics → Business Impact
-      ↓
-Interactive Visualization
+CSV Data
+   ↓
+Graph Builder
+   ↓
+Analysis Engines
+   ↓
+Simulation Engines
+   ↓
+Service Layer
+   ↓
+Streamlit UI
 ```
 
 ---
 
-# 10. Data Flow & Module Interaction
-
-Modules interact primarily through the **NetworkX graph object**.
-
-```
-osmnx_loader.py / csv_loader.py
-        ↓
-graph_builder.py
-        ↓
-network_metrics.py
-        ↓
-cascading_failure.py / targeted_attack.py
-        ↓
-business_metrics_translator.py
-        ↓
-graph_plot.py
-        ↓
-streamlit_app.py
-```
-
-This modular structure enables easy testing, debugging, and extension of individual components.
-
----
-
-# 11. Scalability Considerations
-
-Future improvements may include:
-
-### Large Network Handling
-
-Migration to graph databases such as:
-
-* Neo4j
-
-for large-scale global supply chain networks.
-
----
-
-### Parallel Simulations
-
-Running large numbers of disruption scenarios using:
-
-* multiprocessing
-* distributed computing frameworks
-* Monte Carlo simulations
-
----
-
-### Real-Time Data Integration
-
-Potential integration with:
-
-* maritime shipping APIs
-* logistics tracking systems
-* infrastructure monitoring services
-
----
-
-# 12. Design Principles
-
-The system architecture follows several design principles.
+# 11. Design Principles
 
 ### Modularity
 
-Each module performs a single responsibility.
-
----
+Each component is independently testable.
 
 ### Extensibility
 
-New simulation models or metrics can be added without modifying existing modules.
+New simulation models can be added easily.
+
+### Determinism
+
+Simulations are reproducible.
+
+### Realism
+
+Time-based routing and capacity constraints improve fidelity.
 
 ---
 
-### Reproducibility
+# 12. Scalability Considerations
 
-Simulation results can be reproduced using fixed seeds and deterministic graph operations.
+Future enhancements:
 
----
-
-### Transparency
-
-All analyses rely on established methods from **network science and graph theory**.
+* stochastic disruptions
+* Monte Carlo simulation
+* multi-layer supply chain networks
+* graph databases (Neo4j)
+* distributed simulation
 
 ---
 
 # Conclusion
 
-The Supply Chain Fragility & Risk Analyzer combines graph modeling, network science metrics, disruption simulations, and business-impact translation to analyze supply chain resilience.
+The Supply Chain Fragility & Risk Analyzer integrates:
 
-By modeling supply chains as dynamic networks, the system provides a framework for understanding how infrastructure failures propagate through complex logistics systems and how these disruptions affect operational and economic outcomes.
+* graph modeling
+* disruption simulation
+* economic impact translation
+
+into a unified **digital twin framework**.
+
+By combining network science with business metrics, the system enables **actionable insights for real-world supply chain resilience**.

@@ -2,277 +2,279 @@
 
 ## Supply Chain Fragility & Risk Analyzer
 
-This document outlines the **planned development stages** and **future enhancements** for the Supply Chain Fragility & Risk Analyzer.
+This document outlines the evolution of the Supply Chain Fragility & Risk Analyzer from its current implementation to future advanced capabilities.
 
-The roadmap defines how the system is expected to evolve from the current research prototype (MVP) into a more advanced analytical platform for supply chain resilience analysis.
+The roadmap reflects:
 
-The development plan focuses on improving:
-
-* **modeling realism**
-* **simulation capabilities**
-* **scalability**
-* **data integration**
-* **analytical depth**
+* current system capabilities
+* short-term enhancements
+* long-term vision
 
 ---
 
-# 1. Overview
+# 1. Current System (MVP+)
 
-This document outlines the planned development stages and future enhancements for the Supply Chain Fragility & Risk Analyzer.
-
-The roadmap defines how the system is expected to evolve from the current research prototype (MVP) into a more advanced analytical platform for supply chain resilience analysis.
-
-The development plan focuses on improving:
-
-modeling realism
-
-simulation capabilities
-
-
-The MVP currently supports the following baseline capabilities:
-
-### Data Ingestion
-
-CSV-based supply chain dataset ingestion.
-
-### Network Construction
-
-Graph-based network construction using **NetworkX**.
-
-### Analysis
-
-Structural network analysis computing **Degree Centrality** and **Betweenness Centrality**.
-
-### Simulation
-
-Node and edge disruption simulations, including **random failures** and **targeted attacks**.
-
-### Visualization
-
-Network visualization using **Plotly** and **Streamlit** dashboards.
-
-This foundation enables basic research into supply chain network resilience and the identification of critical infrastructure nodes.
+The project has evolved beyond a basic prototype into a **functional analytical system**.
 
 ---
 
-# 3. Phase 1 – Data and Infrastructure Improvements
+## Implemented Capabilities
 
-The first development phase focuses on improving **data quality**, **ingestion flexibility**, and **infrastructure representation**.
+### Graph Modeling
 
-## Expanded Data Sources
-
-Integration of additional infrastructure datasets, including:
-
-* global port datasets
-* airport logistics hubs
-* rail transportation networks
-
-These datasets will help create more **realistic supply chain network models**.
-
-## Flexible Data Import Formats
-
-Moving beyond CSV to support additional formats such as:
-
-* **JSON**
-* **GeoJSON**
-* **Parquet**
-* live API-based data ingestion
-
-This will allow easier integration with external logistics data systems.
-
-## Improved Data Validation
-
-Implementation of stronger validation mechanisms, including:
-
-* schema validation
-* coordinate sanity checks
-* duplicate node detection
-* edge consistency verification
-
-These improvements will enhance **data reliability** and **reproducibility**.
+* directed multi-route network using `NetworkX MultiDiGraph`
+* supports parallel transport routes
 
 ---
 
-# 4. Phase 2 – Advanced Network Modeling
+### Baseline & Scenario Analysis
 
-This phase focuses on improving the **structural realism** of the supply chain network model.
+* shortest path routing
+* node and edge disruption testing
+* multi-flow evaluation
 
-## Multi-Layer Supply Chain Modeling
+---
 
-Real supply chains contain **multiple interconnected layers**, including:
+### Cascade Simulation Engine
 
-* raw material extraction
+* capacity-aware routing
+* demand propagation
+* overload detection
+* cascading failures across steps
+
+---
+
+### Business Impact Modeling
+
+* reroute cost
+* delay penalty
+* unmet demand loss
+* total economic impact
+
+---
+
+### Interactive Dashboard
+
+* Streamlit-based UI
+* KPI cards
+* flow impact tables
+* cascade step metrics
+
+---
+
+### Testing & Validation
+
+* pytest-based deterministic test suite
+* scenario validation
+* cascade behavior verification
+
+---
+
+# 2. Phase 1 – Data & Input Enhancements
+
+Focus: **improve realism and usability**
+
+---
+
+## Planned Improvements
+
+* support for JSON / Parquet datasets
+* improved schema validation
+* better handling of missing or inconsistent data
+* optional geospatial attributes (lat/long)
+
+---
+
+# 3. Phase 2 – Advanced Network Modeling
+
+Focus: **increase structural realism**
+
+---
+
+## Multi-Layer Supply Chain Graphs
+
+Model layers explicitly:
+
+* suppliers
 * manufacturing
-* transportation
+* logistics
 * distribution
 
-Future versions will introduce **multi-layer graph models** that explicitly represent these layers.
+---
 
-This will enable more accurate modeling of **inter-layer dependencies** and **disruption propagation**.
+## Enhanced Capacity Modeling
 
-## Capacity-Constrained Networks
+Extend current capacity logic to include:
 
-The current model assumes **unlimited capacity** for nodes and edges.
+* node capacity constraints
+* congestion thresholds
+* queue-based delay modeling
 
-Future improvements may introduce:
+---
 
-* port throughput limits
-* warehouse storage capacity
-* transportation corridor constraints
-* congestion modeling
+## Risk Attribute Integration
 
-These features will enable simulation of **bottleneck** and **congestion effects**.
-
-## Weighted Risk Modeling
-
-Additional attributes may be introduced to capture **risk factors**, including:
+Add attributes such as:
 
 * disruption probability
-* geopolitical risk indices
-* environmental risk indicators
-* infrastructure reliability scores
-
-These attributes will enable more **sophisticated risk-aware simulations**.
+* reliability scores
+* geopolitical risk indicators
 
 ---
 
-# 5. Phase 3 – Advanced Simulation Capabilities
+# 4. Phase 3 – Advanced Simulation
 
-This phase focuses on upgrading the **disruption simulation engine**.
-
-## Partial Infrastructure Failures
-
-Future versions may move beyond **binary failure models** to support:
-
-* partial capacity reductions
-* congestion-based delays
-* gradual infrastructure recovery
-
-This would better reflect **real-world disruption dynamics**.
-
-## Cascading Failure Modeling
-
-Advanced models may simulate **secondary failures** triggered by primary disruptions, such as:
-
-* overload of alternative routes
-* port congestion spillover
-* regional supply shortages
-
-These cascading effects are critical for understanding **systemic supply chain fragility**.
-
-## Scenario-Based Simulation
-
-The system may support predefined disruption scenarios such as:
-
-* port strikes
-* natural disasters
-* geopolitical trade restrictions
-* transportation corridor closures
-
-These scenarios will help analyze **policy and strategic risk planning**.
-
-# 6. Phase 4 – Machine Learning Integration
-
-Future versions may incorporate **machine learning techniques** to enhance predictive capabilities.
-
-## Disruption Risk Prediction
-
-Machine learning models could estimate disruption probabilities based on:
-
-* historical infrastructure failures
-* weather data
-* geopolitical indicators
-
-## Supply Chain Vulnerability Detection
-
-Graph-based learning algorithms could identify **hidden structural weaknesses**.
-
-Potential techniques include:
-
-* **Graph Neural Networks (GNNs)**
-* node embedding models
-* anomaly detection methods
-
-## Predictive Impact Modeling
-
-Machine learning approaches may improve estimation of **operational and financial impacts** of disruptions, moving beyond static heuristic models.
+Focus: **improve simulation depth**
 
 ---
 
-# 7. Phase 5 – Scalability and Performance
+## Partial Failures
 
-As the network size grows, **computational performance** becomes increasingly important.
+Move beyond binary failures:
 
-## Parallel Simulation
+* capacity reduction
+* gradual degradation
+* recovery over time
 
-Monte Carlo simulations could be parallelized using frameworks such as:
+---
 
-* **Python multiprocessing**
-* **Dask**
-* **Ray**
+## Scenario Library
 
-This would significantly reduce simulation runtime.
+Predefined simulations:
+
+* port shutdowns
+* regional disruptions
+* trade route blockages
+
+---
+
+## Stochastic Simulation
+
+Introduce controlled randomness:
+
+* probabilistic disruptions
+* demand variability
+* scenario sampling
+
+---
+
+# 5. Phase 4 – Machine Learning Integration
+
+Focus: **predictive intelligence**
+
+---
+
+## Risk Prediction Models
+
+* disruption likelihood estimation
+* time-to-recovery prediction
+
+---
+
+## Graph Learning
+
+* Graph Neural Networks (GNNs)
+* node embeddings
+* anomaly detection
+
+---
+
+## Impact Prediction
+
+Replace heuristic cost models with:
+
+* learned impact estimators
+* historical data calibration
+
+---
+
+# 6. Phase 5 – Scalability & Performance
+
+Focus: **large-scale simulation**
+
+---
+
+## Parallel Execution
+
+* multiprocessing
+* Dask / Ray integration
+
+---
 
 ## Distributed Graph Processing
 
-For very large supply chain networks, distributed graph processing systems may be integrated, including:
-
-* **Neo4j**
-* **Apache Spark GraphX**
-* **GraphFrames**
-
-## Cloud Deployment
-
-Cloud infrastructure could support large-scale simulation workloads using platforms such as:
-
-* **AWS**
-* **Google Cloud**
-* **Microsoft Azure**
-
-# 8. Phase 6 – Interactive Analytical Platform
-
-Future versions may evolve into a **fully interactive analytical platform**.
-
-## Interactive Simulation Dashboard
-
-Users could:
-
-* select disruption scenarios
-* adjust network parameters
-* visualize simulation results in real time
-
-Potential technologies include **Streamlit**, **Dash**, or **React-based dashboards**.
-
-## Real-Time Data Integration
-
-Integration with live logistics data sources could allow:
-
-* dynamic network updates
-* live disruption monitoring
-* near-real-time risk assessment
-
-## Decision Support Tools
-
-The platform may eventually provide tools for:
-
-* supply chain risk planning
-* infrastructure investment analysis
-* resilience strategy evaluation
+* Neo4j
+* Apache Spark GraphX
+* GraphFrames
 
 ---
 
-# 9. Long-Term Vision
+## Cloud Deployment
 
-The long-term goal of the project is to develop a **comprehensive analytical platform** for studying supply chain resilience at scale.
+* AWS / GCP / Azure
+* scalable simulation workloads
 
-The system may eventually support:
+---
 
-* **global supply chain risk analysis**
-* **real-time disruption monitoring**
-* **predictive resilience modeling**
+# 7. Phase 6 – Productization
 
-Such a platform could be valuable for:
+Focus: **real-world usability**
 
-* **academic research**
-* **logistics industry analysis**
-* **enterprise infrastructure planning**
+---
+
+## Enhanced UI
+
+* scenario comparison
+* parameter tuning controls
+* interactive filters
+
+---
+
+## Real-Time Data Integration
+
+* live logistics feeds
+* disruption alerts
+* dynamic graph updates
+
+---
+
+## Decision Support Tools
+
+* resilience planning
+* investment prioritization
+* risk dashboards
+
+---
+
+# 8. Long-Term Vision
+
+The long-term goal is to build a **full-scale supply chain digital twin platform**.
+
+The system may evolve into:
+
+* real-time supply chain monitoring system
+* predictive disruption analytics engine
+* enterprise decision-support platform
+
+---
+
+## Potential Applications
+
+* logistics optimization
+* infrastructure risk analysis
+* academic research
+* enterprise supply chain strategy
+
+---
+
+# 9. Summary
+
+The roadmap evolves the system across three dimensions:
+
+* **realism** (multi-layer + capacity + stochastic modeling)
+* **intelligence** (ML + predictive analytics)
+* **scale** (distributed + cloud-native)
+
+The current system already provides a **strong foundation**, with deterministic simulation, cascade modeling, and business impact analysis.
+
+Future enhancements will transform it into a **comprehensive supply chain resilience platform**.

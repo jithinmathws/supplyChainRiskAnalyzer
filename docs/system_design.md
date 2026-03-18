@@ -2,337 +2,413 @@
 
 ## Supply Chain Fragility & Risk Analyzer
 
-The Supply Chain Fragility & Risk Analyzer is a **computational framework** designed to analyze the structural resilience of supply chain networks and simulate disruption scenarios.
+The **Supply Chain Fragility & Risk Analyzer** is a modular analytical platform designed to evaluate supply chain resilience using **graph-based digital twin modeling** and **disruption simulation**.
 
-The system models supply chains as **directed graphs**, where infrastructure locations and logistics facilities form nodes, and transportation routes form edges. Using **graph-theoretic analysis** and simulation techniques, the platform identifies critical infrastructure, evaluates network fragility, and estimates potential operational and financial impacts caused by disruptions.
+The system models supply chains as **directed multi-route networks** and evaluates fragility using:
 
-The system architecture is designed with the following principles:
+* scenario-based disruption testing
+* capacity-aware cascading simulations
+* **time-based routing (lead-time modeling)**
+* **flow-level economic impact analysis**
 
-* **Modularity** – Each analytical component operates independently
-* **Reproducibility** – Experiments can be repeated using standardized datasets
-* **Extensibility** – New models and analytics can be integrated easily
-* **Transparency** – All assumptions and algorithms are explicitly documented
+Unlike traditional structural network tools, the platform emphasizes:
 
-This document describes the system's **architectural components**, **data flow**, and **analytical pipeline**.
+* **flow-driven behavior** (demand routing, not static topology)
+* **rerouting feasibility under disruption**
+* **business impact translation (cost, delay, unmet demand)**
 
----
-
-# 1. System Overview
-
-The Supply Chain Fragility & Risk Analyzer is a computational framework designed to analyze the structural resilience of supply chain networks and simulate disruption scenarios.
-
-The system models supply chains as directed graphs, where infrastructure locations and logistics facilities form nodes, and transportation routes form edges. Using graph-theoretic analysis and simulation techniques, the platform identifies critical infrastructure, evaluates network fragility, and estimates potential operational and financial impacts caused by disruptions.
-
-The system architecture is designed with the following principles:
-
-Modularity – Each analytical component operates independently.
-
-Reproducibility – Experiments can be repeated using standardized datasets.
-
-
-This document describes the system’s architectural components, data flow, and analytical pipeline.
+This document describes the system’s **design principles**, **components**, and **analytical pipeline**.
 
 ---
 
-# 2. System Architecture
+# 1. Design Objectives
 
-The platform follows a **modular pipeline architecture** composed of multiple processing stages. Each component operates as a separate functional module within the simulation workflow.
+### Modularity
 
-                +----------------------+
-                |  Input Data Sources  |
-                |  (CSV / OSM Data)    |
-                +----------+-----------+
-                           |
-                           v
-                +----------------------+
-                |   Data Ingestion     |
-                +----------+-----------+
-                           |
-                           v
-                +----------------------+
-                | Network Construction |
-                +----------+-----------+
-                           |
-                           v
-                +----------------------+
-                |  Network Analysis    |
-                |  (Centrality etc.)   |
-                +----------+-----------+
-                           |
-                           v
-                +----------------------+
-                | Disruption Simulation|
-                +----------+-----------+
-                           |
-                           v
-                +----------------------+
-                | Impact Assessment    |
-                +----------+-----------+
-                           |
-                           v
-                +----------------------+
-                | Visualization Layer  |
-                +----------------------+
+Each analytical component operates independently with clear interfaces.
+
+### Reproducibility
+
+Simulations are deterministic and reproducible with fixed inputs.
+
+### Extensibility
+
+New simulation models, metrics, and datasets can be added easily.
+
+### Transparency
+
+Uses interpretable graph-based logic instead of black-box models.
+
+### Realism
+
+Incorporates **time-based routing, capacity constraints, and demand flow behavior**.
 
 ---
 
-# 3. Data Ingestion Layer
+# 2. System Overview
 
-The Data Ingestion Layer is responsible for **loading**, **validating**, and **preprocessing** supply chain datasets before network construction.
+The platform follows a structured analytical pipeline:
 
-## Input Data Types
-
-The system accepts structured datasets describing supply chain infrastructure and transportation connectivity.
-
-| Dataset | Description |
-|---------|-------------|
-| Nodes dataset | Ports, warehouses, factories, logistics hubs |
-| Edges dataset | Transport routes between nodes |
-| Geographic data | Coordinates for mapping and routing |
-| Throughput values | Estimated daily logistics volumes |
-
-## Data Format
-
-The system currently uses **CSV-based datasets** for reproducibility.
-
-**Example Node Schema:**
-
-```
-node_id, node_type, latitude, longitude, throughput_value
+```id="sysflow1"
+CSV Dataset  
+     ↓  
+Graph Construction  
+     ↓  
+Baseline Network Analysis  
+     ↓  
+Scenario Analysis  
+     ↓  
+Cascade Simulation  
+     ↓  
+Business Impact Engine  
+     ↓  
+Interactive Visualization  
 ```
 
-**Example Edge Schema:**
-
-```
-source_node, target_node, transport_mode, distance_km, cost_index
-```
-
-## Preprocessing Tasks
-
-The ingestion module performs:
-
-* Data validation
-* Missing value handling
-* Coordinate verification
-* Graph-ready formatting
+Each stage transforms the network into progressively higher-level insights.
 
 ---
 
-# 4. Network Construction Layer
-
-The Network Construction Module transforms the ingested datasets into a **graph representation** suitable for network analysis.
-
-The supply chain network is modeled as a **directed graph**:
-
-```
-G = (V, E)
-```
-
-**Where:**
-
-* `V` represents infrastructure nodes
-* `E` represents transportation connections
-
-The system uses the **NetworkX Python library** to construct and analyze the graph.
-
-| Property | Description |
-|----------|-------------|
-| Graph type | Directed (nx.DiGraph) |
-| Node attributes | Location, infrastructure type, throughput |
-| Edge attributes | Distance, cost estimate, transport mode |
+# 3. Core Design Components
 
 ---
 
-# 5. Network Analysis Module
+## 3.1 Data Ingestion Layer
 
-The Network Analysis Module evaluates **structural properties** of the supply chain graph to identify critical nodes and structural vulnerabilities.
+### Responsibilities
 
-## Key Metrics
-
-### Degree Centrality
-
-Measures how many direct connections a node has.
-
-High values often indicate **major logistics hubs**.
-
-### Betweenness Centrality
-
-Measures how frequently a node appears on shortest paths between other nodes.
-
-Nodes with high betweenness act as **network bottlenecks**.
-
-### Closeness Centrality
-
-Measures how quickly a node can reach all other nodes in the network.
-
-Nodes with high closeness are typically **efficient distribution points**.
-
-## Network Connectivity Metrics
-
-Global network metrics include:
-
-* Number of connected components
-* Average path length
-* Network density
-
-These metrics describe the **overall structural robustness** of the network.
+Loads and validates structured datasets describing supply chain infrastructure.
 
 ---
 
-# 6. Disruption Simulation Engine
+### Input Types
 
-The Disruption Simulation Engine models **supply chain failures** by removing nodes or edges from the network and observing the resulting structural changes.
-
-## 6.1 Node Failure Simulation
-
-Node failure represents the disruption of **critical infrastructure** such as:
-
-* ports
-* manufacturing facilities
-* distribution centers
-
-When a node is removed:
-
-* All connected edges are removed
-* Shortest paths are recalculated
-* Network fragmentation is measured
-
-## 6.2 Edge Failure Simulation
-
-Edge failure represents **transportation route disruptions** such as:
-
-* shipping lane closures
-* rail corridor interruptions
-* road network blockages
-
-Edge removal may increase travel distances or disconnect parts of the network.
-
-## 6.3 Monte Carlo Simulations
-
-To evaluate systemic fragility, the engine performs **randomized Monte Carlo disruption experiments**.
-
-**Typical simulation workflow:**
-
-* Randomly select nodes or edges
-* Apply disruption
-* Recalculate network metrics
-* Record system performance
-* Repeat across multiple iterations
-
-This produces **statistical estimates** of network resilience.
+| Dataset             | Description                       |
+| ------------------- | --------------------------------- |
+| nodes.csv           | Supply chain entities             |
+| edges.csv           | Primary transport routes          |
+| alternate_edges.csv | Backup routes                     |
+| flows.csv           | Demand flows (origin–destination) |
 
 ---
 
-# 7. Impact Assessment Module
+### Validation Pipeline
 
-The Impact Assessment Module translates **structural disruptions** into operational and financial consequences.
+* schema validation
+* type normalization
+* duplicate detection
+* referential integrity checks
+* missing value handling
 
-## 7.1 Operational Impact
+---
 
-Operational impact is estimated using:
+## 3.2 Graph Construction Layer
 
-* network fragmentation
-* path length increases
-* unreachable nodes
+### Responsibilities
 
-These metrics estimate potential **supply chain delays**.
+Transforms structured data into a **directed network model**.
 
-## 7.2 Financial Impact Estimation
+---
 
-The system estimates economic impact using **simplified throughput-based models**.
+### Graph Representation
 
-```
-Cost_Impact = Delay × Daily_Throughput_Value
+```id="sysgraph1"
+NetworkX MultiDiGraph
 ```
 
-**Where:**
+Supports:
 
-* `Delay` is estimated based on increased path length
-* `Throughput Value` approximates the economic value moving through a node
-
-These estimates provide **directional risk indicators** rather than precise financial forecasts.
-
----
-
-# 8. Visualization & Reporting Layer
-
-The system includes tools to visualize network structure and disruption effects using libraries such as:
-
-* **Plotly**
-* **Streamlit**
-
-The platform generates:
-
-* network topology maps
-* critical node highlighting
-* disruption impact charts
-* resilience distribution plots
-
-These visualizations help analysts interpret simulation results.
+* parallel routes
+* multiple transport modes
+* redundancy modeling
+* capacity-aware simulation
 
 ---
 
-# 9. Data Flow Pipeline
+### Key Design Decision
 
-The complete analytical pipeline follows a **strict, sequential workflow**:
+> Edge **weight represents time (lead time)** — not distance or hop count.
 
+This enables:
+
+* realistic routing
+* delay-aware simulation
+* meaningful business metrics
+
+---
+
+### Node Attributes
+
+* type
+* capacity
+* location
+* tier
+* recovery_time
+
+---
+
+### Edge Attributes
+
+* transport_mode
+* distance
+* **weight (time)**
+* capacity
+* cost
+* reliability
+
+---
+
+## 3.3 Baseline Network Analysis
+
+### Responsibilities
+
+Establishes baseline network behavior before disruptions.
+
+---
+
+### Core Capabilities
+
+* shortest path computation (time-based)
+* baseline lead-time estimation
+* route feasibility validation
+
+---
+
+### Routing Method
+
+```id="sysroute1"
+Dijkstra Shortest Path (weight = time)
 ```
-Input Datasets
-      ↓
-Data Ingestion
-      ↓
-Network Construction
-      ↓
-Network Analysis
-      ↓
-Disruption Simulation
-      ↓
-Impact Assessment
-      ↓
-Visualization & Reporting
+
+---
+
+## 3.4 Scenario Analysis Engine
+
+### Responsibilities
+
+Evaluates fragility across multiple flows under disruptions.
+
+---
+
+### Capabilities
+
+* node disruption simulation
+* edge disruption simulation
+* multi-flow evaluation
+* aggregated impact scoring
+
+---
+
+### Outputs
+
+* bottleneck rankings
+* disruption classification (delivered / rerouted / disconnected)
+* lead-time increase
+* cost change
+
+---
+
+## 3.5 Cascade Simulation Engine
+
+### Responsibilities
+
+Models **dynamic cascading failures** driven by demand and capacity.
+
+---
+
+### Core Simulation Loop
+
+1. Apply initial disruption
+2. Recompute shortest paths
+3. Route flows
+4. Accumulate edge loads
+5. Remove overloaded edges
+6. Repeat until stable
+
+---
+
+### Key Design Feature
+
+> Simulation is **flow-driven**, not purely structural.
+
+Meaning:
+
+* demand flows determine stress
+* network evolves dynamically
+* failures propagate realistically
+
+---
+
+### Outputs
+
+#### Flow-Level Metrics
+
+* baseline vs final path
+* rerouting status
+* delivered vs unmet demand
+* **time increase (delay)**
+* cost increase
+* hop increase
+
+---
+
+#### System-Level Metrics
+
+* service level
+* disrupted flows
+* unmet demand
+* total economic impact
+
+---
+
+#### Step-Level Metrics
+
+* routed demand per step
+* new failures
+* cumulative failures
+
+---
+
+## 3.6 Business Impact Engine
+
+### Responsibilities
+
+Converts simulation outputs into **decision-relevant KPIs**.
+
+---
+
+### Economic Model
+
+#### Reroute Cost
+
+```id="syscost1"
+(cost increase × demand × reroute_cost_rate)
 ```
 
-Each stage produces **intermediate outputs** used by subsequent modules.
+#### Delay Penalty
+
+```id="syscost2"
+(time increase × demand × delay_penalty_rate)
+```
+
+#### Unmet Demand Loss
+
+```id="syscost3"
+(unmet demand × unmet_demand_loss_rate)
+```
 
 ---
 
-# 10. Scalability Considerations
+### Aggregate Outputs
 
-The current implementation is optimized for **small-to-medium supply chain networks**.
-
-Large-scale networks may require:
-
-* distributed graph processing
-* parallel Monte Carlo simulations
-* cloud-based compute infrastructure
-
-Future versions may integrate scalable graph frameworks such as **Neo4j** or distributed graph processing systems.
+* total economic impact
+* service level
+* unmet demand
+* disruption ratio
 
 ---
 
-# 11. Extensibility
+### Key Insight
 
-The modular design allows for **future expansion** of system capabilities.
-
-**Potential extensions include:**
-
-* **real-time logistics data integration**
-* **machine learning risk prediction models**
-* **multi-layer supply chain graph modeling**
-* **capacity-constrained transportation networks**
-* **agent-based supply chain behavior simulation**
+> The system bridges **network behavior → business outcomes**, enabling practical decision support.
 
 ---
 
-# 12. Summary
+# 4. Visualization & Application Layer
 
-The Supply Chain Fragility & Risk Analyzer provides a **structured analytical platform** for studying supply chain resilience using network science.
+### Responsibilities
 
-Through **modular system architecture** and **reproducible simulation pipelines**, the system enables researchers and analysts to:
+Provides an interactive interface for analysis and simulation.
 
-* **identify critical infrastructure nodes**
-* **simulate disruption scenarios**
-* **quantify systemic fragility**
-* **estimate operational risk**
+---
 
-The framework serves as a foundation for future research in supply chain resilience, network fragility, and disruption mitigation strategies.
+### Technologies
+
+* Streamlit
+* Plotly
+
+---
+
+### UI Architecture
+
+* service-layer abstraction
+* modular UI components
+* session state management
+
+---
+
+### UI Modules
+
+* Node Analysis
+* Edge Analysis
+* Scenario Analysis
+* Cascade Simulation
+* Network Visualization
+
+---
+
+### User Capabilities
+
+* define demand flows
+* simulate disruptions
+* analyze cascading failures
+* evaluate economic impact
+
+---
+
+# 5. Data Flow Design
+
+```id="sysflow2"
+Input Data
+     ↓
+Graph Builder
+     ↓
+Baseline Analysis
+     ↓
+Scenario Engine
+     ↓
+Cascade Simulator
+     ↓
+Business Metrics Engine
+     ↓
+Visualization
+```
+
+---
+
+# 6. Scalability Considerations
+
+Current system supports **small-to-medium networks**.
+
+Future improvements:
+
+* stochastic demand modeling
+* Monte Carlo simulation
+* distributed computation
+* multi-layer supply chain graphs
+* graph databases (Neo4j)
+
+---
+
+# 7. Extensibility
+
+The modular design supports:
+
+* probabilistic disruption models
+* real-time data integration
+* ML-based risk prediction
+* agent-based simulations
+
+---
+
+# 8. Summary
+
+The Supply Chain Fragility & Risk Analyzer provides a **digital twin framework** for supply chain resilience.
+
+By combining:
+
+* graph modeling
+* flow-based simulation
+* economic impact analysis
+
+the system enables **deep, actionable insights into network fragility and disruption risk**.

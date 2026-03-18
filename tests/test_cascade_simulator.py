@@ -41,6 +41,14 @@ def test_disrupted_edge_reroutes_flow_without_failures():
     assert flow["final_cost"] == 4.0
     assert flow["cost_increase"] == 2.0
 
+    assert flow["baseline_time"] == 2.0
+    assert flow["final_time"] == 4.0
+    assert flow["time_increase"] == 2.0
+
+    assert flow["baseline_hops"] == 2
+    assert flow["final_hops"] == 2
+    assert flow["hop_increase"] == 0
+
     assert flow["delivered_demand"] == 35.0
     assert flow["unmet_demand"] == 0.0
 
@@ -96,3 +104,50 @@ def test_overload_causes_cascade_and_unmet_demand():
     assert metrics["total_delay_penalty"] == 0.0
     assert metrics["total_unmet_demand_loss"] == 225.0
     assert metrics["total_economic_impact"] == 225.0
+
+
+def test_overloaded_intermediate_node_fails():
+    graph = nx.DiGraph()
+    graph.add_node("A", capacity=100)
+    graph.add_node("B", capacity=5)
+    graph.add_node("D", capacity=100)
+
+    graph.add_edge("A", "B", capacity=100, weight=1)
+    graph.add_edge("B", "D", capacity=100, weight=1)
+
+    simulator = CascadeSimulator(graph)
+
+    result = simulator.run_simulation(
+        flows=[{"source": "A", "target": "D", "demand": 10}],
+        max_steps=5,
+    )
+
+    assert "B" in result["failed_nodes"]
+
+    first_step = result["timeline"][0]
+    assert "node_loads" in first_step
+    assert first_step["node_loads"]["B"]["load"] == 10.0
+    assert first_step["node_loads"]["B"]["capacity"] == 5.0
+
+
+def test_step_metrics_include_node_failure_breakdown():
+    graph = nx.DiGraph()
+    graph.add_node("A", capacity=100)
+    graph.add_node("B", capacity=5)
+    graph.add_node("D", capacity=100)
+
+    graph.add_edge("A", "B", capacity=100, weight=1)
+    graph.add_edge("B", "D", capacity=100, weight=1)
+
+    simulator = CascadeSimulator(graph)
+
+    result = simulator.run_simulation(
+        flows=[{"source": "A", "target": "D", "demand": 10}],
+        max_steps=5,
+    )
+
+    step_metrics = result["timeline"][0]["step_metrics"]
+
+    assert step_metrics["new_failed_node_count"] >= 1
+    assert step_metrics["new_overloaded_node_count"] >= 1
+    assert "new_isolated_node_count" in step_metrics

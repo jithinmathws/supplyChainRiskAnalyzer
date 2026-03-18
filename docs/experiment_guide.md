@@ -1,320 +1,352 @@
 # Experiment Guide
+
 ## Supply Chain Fragility & Risk Analyzer
 
-This document describes how to run disruption simulations using the Supply Chain Fragility & Risk Analyzer and how to interpret the resulting outputs.
+This guide explains how to run simulations using the **Supply Chain Fragility & Risk Analyzer** and how to interpret results.
 
-The guide provides step-by-step procedures for performing controlled experiments on supply chain networks to evaluate their resilience, vulnerability, and cascading failure risks.
+The system allows analysts to perform **flow-based disruption experiments** to evaluate:
+
+* supply chain resilience
+* rerouting behavior
+* cascading failures
+* economic impact
 
 ---
 
 # 1. Purpose
 
-The purpose of this guide is to demonstrate how the system can be used to analyze supply chain fragility through controlled simulation scenarios.
+Experiments help answer:
 
-Experiments allow analysts to:
-
-- Evaluate network resilience
-- Identify critical infrastructure nodes
-- Measure disruption impact
-- Compare alternative logistics routing configurations
-- Estimate operational and financial risk
+* What happens when a key node fails?
+* Can demand still be delivered?
+* How much delay is introduced?
+* What is the economic impact?
 
 ---
 
-# 2. Experiment Setup
+# 2. Setup
 
-Before running experiments, the system must be initialized with a supply chain dataset.
+Before running experiments, ensure:
 
-Required input files:
-
-
-data/nodes.csv
-data/edges.csv
-
+* graph data is loaded (`nodes.csv`, `edges.csv`)
+* flows are defined (default / custom / CSV)
 
 ---
 
-## Node Dataset
+## Required Inputs
 
-Nodes represent supply chain entities such as suppliers, factories, ports, warehouses, and distribution centers.
+### Nodes
 
-Example structure:
+Supply chain entities:
 
-| node_id | node_type | region |
-|--------|-----------|--------|
-| N1 | supplier | Asia |
-| N2 | factory | Europe |
-| N3 | port | Netherlands |
+* suppliers
+* factories
+* ports
+* warehouses
 
 ---
 
-## Edge Dataset
+### Edges
 
-Edges represent transportation connections and dependencies between nodes.
+Transport routes with:
 
-Example structure:
+* time (weight)
+* capacity
+* cost
 
-| source | target | transport_mode | distance |
-|-------|--------|---------------|----------|
-| N1 | N2 | shipping | 8200 |
-| N2 | N3 | rail | 450 |
+---
+
+### Flows
+
+Each flow:
+
+```id="exp1"
+(source, target, demand)
+```
 
 ---
 
 # 3. Running an Experiment
 
-A typical experiment follows the workflow below:
-
-
-Load Dataset
-↓
-Construct Network Graph
-↓
-Compute Baseline Metrics
-↓
-Inject Disruption
-↓
-Recalculate Network Metrics
-↓
-Measure Disruption Impact
-
-
-Each stage allows analysts to observe how disruptions affect the structure and efficiency of the supply chain network.
+In the Streamlit UI:
 
 ---
 
-# 4. Baseline Analysis
+## Step 1 — Select Flows
 
-Before introducing disruptions, the system computes baseline network metrics representing normal supply chain operations.
+Choose:
 
-Baseline metrics include:
-
-- Node degree centrality
-- Betweenness centrality
-- Shortest path routes using Dijkstra's Algorithm
-- Average path length
-- Network connectivity components
-
-These metrics serve as a reference point for comparing post-disruption conditions.
+* Default flows
+* Custom flows
+* Upload flows.csv
 
 ---
 
-# 5. Disruption Experiments
+## Step 2 — Define Disruptions
 
-The system supports several types of disruption experiments to test different risk profiles.
+Select:
 
----
-
-## 5.1 Single Node Failure Experiment
-
-This experiment simulates the failure of a single infrastructure node.
-
-Example scenario:
-
-
-Remove node: Port_Rotterdam
-
-
-Procedure:
-
-1. Load the network dataset
-2. Compute baseline metrics
-3. Remove the selected node
-4. Recalculate network connectivity
-5. Measure routing changes
-6. Compute the fragility score
-
-Insight:
-
-This experiment reveals how dependent the network is on a specific infrastructure component.
+* disrupted nodes
+* disrupted edges
 
 ---
 
-## 5.2 Random Failure Experiment
+## Step 3 — Configure Parameters
 
-This experiment models unexpected disruptions such as natural disasters, accidents, or equipment failures.
-
-Procedure:
-
-1. Randomly select nodes
-2. Remove the selected nodes from the graph
-3. Recompute network metrics
-4. Record connectivity loss
-5. Measure routing efficiency changes
-
-Insight:
-
-Random failure experiments help estimate the overall robustness of the network.
+* demand per flow
+* max simulation steps
+* edge capacity
 
 ---
 
-## 5.3 Targeted Attack Experiment
+## Step 4 — Economic Parameters
 
-This experiment evaluates worst-case scenarios where critical nodes are deliberately removed based on importance metrics.
-
-Procedure:
-
-1. Rank nodes by degree or betweenness centrality
-2. Remove the highest-centrality nodes
-3. Recompute network metrics
-4. Measure fragility and congestion shifts
-
-Insight:
-
-This experiment helps identify severe structural weaknesses in the network.
+* reroute cost rate
+* delay penalty rate
+* unmet demand loss rate
 
 ---
 
-## 5.4 Multi-Node Disruption Experiment
+## Step 5 — Run Simulation
 
-This experiment simulates large-scale disruptions affecting multiple infrastructure nodes.
+Click:
 
-Examples include:
-
-- Regional disasters
-- Geopolitical conflicts
-- Transport route interruptions
-
-Procedure:
-
-1. Select multiple nodes
-2. Remove the nodes simultaneously
-3. Recompute network connectivity
-4. Measure network fragmentation
-5. Analyze routing detours
+```id="exp2"
+Run Cascade Simulation
+```
 
 ---
 
-# 6. Cascading Failure Experiments
-
-Large disruptions may cause cascading congestion across the network.
-
-Procedure:
-
-1. Simulate a major node failure
-2. Recompute routing paths
-3. Measure betweenness centrality shifts
-4. Identify secondary bottleneck nodes
-
-Nodes experiencing significant increases in centrality indicate a high congestion risk.
+# 4. Understanding Results
 
 ---
 
-# 7. Measuring Network Fragility
+## 4.1 KPI Overview
 
-Network fragility measures how severely connectivity is reduced after a disruption.
+Key metrics:
 
-Fragility is derived from the Largest Connected Component (LCC).
-
-
-Fragility = 1 - ( |Clargest'| / |Clargest| )
-
-
-Where:
-
-- **Clargest** = largest connected component before disruption  
-- **Clargest'** = largest connected component after disruption  
-
-### Fragility Interpretation
-
-| Fragility Score | Meaning |
-|----------------|--------|
-| Low | Network remains stable and highly connected |
-| Medium | Partial connectivity loss or fragmentation |
-| High | Severe network breakdown (LCC approaches zero) |
+* **Service Level** → % demand delivered
+* **Unmet Demand** → lost supply
+* **Failed Nodes / Edges** → infrastructure loss
+* **Total Economic Impact** → overall cost
 
 ---
 
-# 8. Evaluating Routing Efficiency
+## 4.2 Flow Impact Table
 
-Disruptions often force goods to travel longer routes, reducing supply chain efficiency.
+Each flow shows:
 
-Routing efficiency is measured using the change in average path length.
-
-
-ΔL = L_after - L_before
-
-
-Where:
-
-- **L_before** = baseline average path length
-- **L_after** = post-disruption path length
-
-Large increases in path length indicate significant logistics disruption.
+* baseline vs final path
+* rerouting status
+* delay (time increase)
+* cost increase
+* delivered vs unmet demand
 
 ---
 
-# 9. Business Impact Interpretation
+### Interpretation
 
-The system converts structural disruptions into operational metrics.
-
-Key outputs include:
-
-- Delivery delay estimates
-- Congestion hotspots
-- Affected infrastructure nodes
-- Disruption impact analysis
-
-Example output:
-
-
-Disrupted Node: Port_Rotterdam
-Network Fragility: 0.32
-Average Path Increase: 18%
-Estimated Delay: 3 days
-Estimated Cost Impact: $1.2M
-
-
-These results help decision-makers evaluate supply chain risks in operational terms.
+| Status    | Meaning                |
+| --------- | ---------------------- |
+| delivered | no disruption          |
+| rerouted  | alternative path found |
+| disrupted | no feasible route      |
 
 ---
 
-# 10. Repeated Experiments (Monte Carlo)
+## 4.3 Step Metrics
 
-To evaluate systemic vulnerability, experiments can be repeated multiple times using randomized disruptions.
+Tracks cascade evolution:
+
+* routed demand per step
+* new failures
+* cumulative failures
+
+---
+
+### Interpretation
+
+* rapid drop in routed demand → network collapse
+* increasing failures → cascading effect
+
+---
+
+## 4.4 Demand Progression Chart
+
+Shows:
+
+* routed demand
+* disrupted demand
+
+👉 Helps visualize resilience over time.
+
+---
+
+## 4.5 Failure Progression Chart
+
+Tracks:
+
+* failed edges
+* failed nodes
+
+👉 Indicates cascade severity.
+
+---
+
+# 5. Experiment Types
+
+---
+
+## 5.1 Single Node Failure
+
+Simulate failure of a critical node.
 
 Example:
 
-
-iterations = 1000
-
-
-Procedure:
-
-1. Randomly select disruption nodes
-2. Simulate the failure
-3. Compute network metrics
-4. Record fragility scores
-5. Repeat across iterations
-
-This produces statistical estimates of network resilience.
+* port shutdown
 
 ---
 
-# 11. Experiment Outputs
+## 5.2 Multi-Node Disruption
 
-Each experiment generates analytical outputs used for further analysis and visualization.
-
-Typical outputs include:
-
-- Disrupted nodes
-- Fragility indicators
-- Node importance ranking
-- Network connectivity metrics
-- Resilience analysis
-
-These outputs can be visualized using the project's interactive Plotly and Streamlit dashboards.
+Simulate regional or systemic shocks.
 
 ---
 
-# 12. Recommended Experiments
+## 5.3 Edge Disruption
 
-Suggested starting experiments for evaluating supply chain resilience:
+Simulate route failures (e.g., blocked shipping lane).
 
-1. Remove the most central node
-2. Simulate the failure of major ports
-3. Run random failure simulations
-4. Test regional multi-node disruptions
-5. Compare baseline versus disrupted routing efficiency
+---
 
-These experiments help analysts understand how supply chain networks behave under stress.
+## 5.4 Flow Stress Testing
+
+Increase demand to test capacity limits.
+
+---
+
+# 6. Cascade Behavior Analysis
+
+Key observations:
+
+---
+
+## Rerouting
+
+Flows attempt alternative paths.
+
+👉 Indicates network redundancy.
+
+---
+
+## Congestion
+
+Load increases on remaining edges.
+
+---
+
+## Cascade Failure
+
+Edges fail when:
+
+```id="exp3"
+load > capacity
+```
+
+---
+
+## Network Collapse
+
+Occurs when:
+
+```id="exp4"
+routed_demand → 0
+```
+
+---
+
+# 7. Economic Impact Interpretation
+
+The system quantifies disruption impact:
+
+---
+
+## Reroute Cost
+
+Extra cost due to longer routes.
+
+---
+
+## Delay Penalty
+
+Cost due to increased travel time.
+
+---
+
+## Unmet Demand Loss
+
+Lost business due to failed delivery.
+
+---
+
+## Total Economic Impact
+
+```id="exp5"
+reroute_cost + delay_penalty + unmet_demand_loss
+```
+
+---
+
+# 8. Recommended Experiments
+
+Start with:
+
+1. Single hub failure
+2. Dual-node disruption
+3. High-demand stress test
+4. Edge disruption (critical route)
+
+---
+
+# 9. Key Insights to Look For
+
+---
+
+## Resilience
+
+* high service level
+* minimal rerouting
+
+---
+
+## Fragility
+
+* high unmet demand
+* rapid cascade
+
+---
+
+## Bottlenecks
+
+* repeated edge failures
+* high reroute dependency
+
+---
+
+## Economic Risk
+
+* high delay penalty
+* high unmet demand loss
+
+---
+
+# 10. Summary
+
+This system enables:
+
+* flow-based disruption analysis
+* realistic cascade simulation
+* time-based delay modeling
+* economic impact evaluation
+
+It provides a practical framework for **stress-testing supply chain networks under disruption scenarios**.

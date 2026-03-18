@@ -2,318 +2,241 @@
 
 ## Supply Chain Fragility & Risk Analyzer
 
-This document describes the data architecture and acquisition strategy used in the Supply Chain Fragility & Risk Analyzer. The goal is to construct network graphs that represent global and regional logistics infrastructure.
+This document describes the dataset design and preparation strategy used in the Supply Chain Fragility & Risk Analyzer.
 
-The dataset strategy supports:
-
-* **disruption simulations**
-* **critical bottleneck identification**
-* **routing delay estimation**
-* **translation of network failures into business impact metrics**
+The system constructs supply chain networks from structured tabular datasets and converts them into a **directed multi-route graph** for disruption simulation.
 
 ---
 
 # 1. Dataset Objectives
 
-To successfully model cascading failures and routing delays, dataset must represent **key structural components** of supply chains.
+The dataset must support:
 
-**Required data characteristics:**
+* flow-based routing
+* cascade simulation
+* delay estimation
+* economic impact modeling
 
-* logistics infrastructure nodes (ports, hubs, factories)
-* transportation connectivity (roads, rail, shipping lanes)
-* routing costs (distance, financial cost, transit time)
-* geographic distribution for geospatial mapping
+To achieve this, datasets represent:
 
-These elements allow the system to build a **realistic transportation network graph**.
+* infrastructure nodes
+* transport connectivity
+* routing time
+* capacity constraints
 
 ---
 
 # 2. Data Architecture
 
-The system models supply chains using a **Node–Edge tabular structure**, which is converted into a directed graph.
+The system uses a **node–edge tabular structure** converted into:
 
-NetworkX Graph Type: nx.DiGraph
+```id="data1"
+nx.MultiDiGraph
+```
 
-## 2.1 Node Data (Infrastructure)
+This enables:
 
-Nodes represent **physical supply chain entities**.
+* parallel routes
+* multi-modal transport
+* capacity-aware simulation
 
-Examples include:
+---
 
-* ports
-* factories
+# 3. Node Dataset (nodes.csv)
+
+Nodes represent supply chain infrastructure:
+
 * suppliers
+* factories
+* ports
 * warehouses
-* logistics hubs
-
-### Node Dataset Structure
-
-| Field | Description | Example |
-|-------|-------------|---------|
-| node_id | Unique identifier | N102 |
-| name | Infrastructure name | Port of Long Beach |
-| type | Entity type (port, factory, warehouse, supplier) | port |
-| latitude | Geographic latitude | 33.7541 |
-| longitude | Geographic longitude | -118.2165 |
-| capacity | Estimated throughput capacity | 130000 |
-| region | Geographic region or cluster | US West Coast |
-
-**Example record:**
-
-```
-node_id: N102
-name: Port of Long Beach
-type: port
-latitude: 33.7541
-longitude: -118.2165
-capacity: 130000
-region: US West Coast
-```
-
-## 2.2 Edge Data (Transportation Links)
-
-Edges represent **transportation corridors** and **logistics dependencies** between nodes.
-
-These connections define pathways used for routing goods across the network.
-
-### Edge Dataset Structure
-
-| Field | Description | Example |
-|-------|-------------|---------|
-| source_node | Origin node_id | Factory_A |
-| destination_node | Destination node_id | N102 |
-| distance_km | Distance between nodes | 1200 |
-| transit_time_days | Estimated travel time | 3 |
-| transport_type | Transport modality (shipping, rail, road, air) | rail |
-| cost_index | Relative financial cost | 0.7 |
-
-**Example record:**
-
-```
-source_node: Factory_A
-destination_node: N102
-distance_km: 1200
-transit_time_days: 3
-transport_type: rail
-cost_index: 0.7
-```
-
-## 3. Data Acquisition Strategy
-
-The project uses a **hybrid data strategy** that combines:
-
-* **real-world logistics infrastructure**
-* **synthetic network generation**
-
-This approach enables both realistic analysis and scalable simulation.
-
-## 3.1 Real-World Geospatial Data (OSMnx)
-
-To analyze real-world logistics choke points, the system extracts infrastructure networks using the **OSMnx Python library**.
-
-OSMnx provides access to transportation infrastructure from **OpenStreetMap (OSM)**.
-
-### Data Sources
-
-* **OpenStreetMap APIs**
-* global road networks
-* railway infrastructure
-* industrial districts
-
-### Example Target Regions
-
-* major port logistics networks
-* industrial manufacturing clusters
-* global freight corridors
-
-**Examples:**
-
-* Port of Rotterdam logistics network
-* Ruhr Valley industrial corridor
-* Southeast Asian port networks
-
-### Benefits
-
-* high-resolution transportation graphs
-* realistic routing structures
-* accurate geospatial representation
-
-## 3.2 Synthetic Data Generation
-
-Real supply chain data is often **proprietary or incomplete**.
-To address this limitation, the system supports synthetic dataset generation.
-
-Synthetic datasets allow the system to:
-
-* simulate large-scale logistics networks
-* stress-test algorithms
-* run large disruption simulations
-
-**Synthetic generation includes:**
-
-* randomized geographic node placement
-* clustered industrial zones
-* simulated logistics hubs
-* scalable network expansion
-
-Example large-scale test networks may include **5,000+ nodes**.
+* distribution hubs
 
 ---
 
-# 4. Graph Construction Pipeline
+## Required Fields
 
-The dataset is transformed into a computational model using the following pipeline.
+| Field   | Description         |
+| ------- | ------------------- |
+| node_id | Unique identifier   |
+| name    | Infrastructure name |
+| type    | Entity category     |
+| region  | Geographic grouping |
 
 ---
 
-## Step 1 — Data Ingestion
+## Optional Fields
 
-Load datasets into the system.
+| Field                | Description           |
+| -------------------- | --------------------- |
+| capacity             | Throughput estimate   |
+| latitude / longitude | Visualization support |
 
+---
+
+# 4. Edge Dataset (edges.csv)
+
+Edges represent transport relationships.
+
+---
+
+## Required Fields
+
+| Field        | Description                    |
+| ------------ | ------------------------------ |
+| source       | Origin node                    |
+| target       | Destination node               |
+| transit_time | Travel time (used for routing) |
+
+---
+
+## Optional Fields
+
+| Field          | Description                 |
+| -------------- | --------------------------- |
+| capacity       | Throughput constraint       |
+| cost           | Transport cost              |
+| distance       | Distance metric             |
+| transport_mode | Mode (rail, road, sea, air) |
+
+---
+
+# 5. Routing Weight Design
+
+Routing uses:
+
+```id="data2"
+weight = transit_time
 ```
-nodes.csv
+
+👉 Time is chosen because it best reflects logistics performance.
+
+Distance and cost are stored for:
+
+* reporting
+* economic modeling
+
+---
+
+# 6. Data Preparation Pipeline
+
+---
+
+## Step 1 — Load Data
+
+```id="data3"
+nodes.csv  
 edges.csv
 ```
 
-These files are loaded into **Pandas DataFrames**.
+Loaded into Pandas.
 
 ---
 
-## Step 2 — Data Normalization
+## Step 2 — Validation
 
-Preprocessing operations include:
+Checks include:
 
-* removing duplicate nodes
-* validating edge references
-* handling missing values
-* normalizing geographic coordinates
-
----
-
-## Step 3 — Edge Weight Calculation
-
-Each edge receives a weight representing **transportation friction**.
-
-This value is used by shortest-path algorithms such as **Dijkstra's algorithm**.
-
-**Weight formula:**
-
-```
-weight =
-(alpha * distance_km) +
-(beta * transit_time_days) +
-(gamma * cost_index)
-```
-
-**Where:**
-
-* `alpha` = distance importance
-* `beta` = transit time importance
-* `gamma` = financial cost importance
+* duplicate nodes
+* missing references
+* numeric consistency
 
 ---
 
-## Step 4 — Graph Instantiation
+## Step 3 — Graph Construction
 
-The processed dataset is converted into a **directed graph**.
+Graph created as:
 
-**Example:**
-
-```
-G = nx.DiGraph()
+```id="data4"
+nx.MultiDiGraph()
 ```
 
-Nodes and edges are added with their attributes.
+Edges include:
 
-**Example:**
+* time weight
+* capacity
+* cost
 
-```
-G.add_node(node_id, type=type, capacity=capacity)
+---
 
-G.add_edge(source, destination,
-           distance=distance_km,
-           transit_time=transit_time_days,
-           cost_index=cost_index)
-```
+# 7. Dataset Scaling Strategy
 
-## 5. Dataset Scaling Configurations
+Typical dataset sizes:
 
-The system supports multiple dataset sizes depending on simulation complexity.
+| Scale  | Nodes | Use Case       |
+| ------ | ----- | -------------- |
+| Small  | 50    | testing        |
+| Medium | 200   | regional       |
+| Large  | 1000+ | stress testing |
 
-Network Size	Nodes	Edges	Use Case
-Small	50	150	Algorithm testing
-Medium	200	800	Regional modeling
-Large	1000+	5000+	Global disruption simulations
+---
 
-Larger networks allow more realistic modeling of cascading supply chain failures.
+# 8. Data Sources Strategy
 
-## 6. Dataset Storage Format
+---
 
-Datasets are stored as portable CSV files.
+## 8.1 Current Approach (Implemented)
 
-Example directory structure:
+The project currently uses:
 
-dataset/
-    nodes.csv
-    edges.csv
+* curated synthetic datasets
+* manually structured logistics networks
 
-These files are loaded during runtime and converted into network graph used for analysis.
+👉 These support controlled experimentation.
 
-## 7. Dataset Limitations & Mitigation
+---
 
-Real-world logistics data presents several challenges.
+## 8.2 Future Data Integration (Planned)
 
-### Incomplete Private Data
+Potential sources:
 
-Many enterprise supply chains are proprietary and not publicly accessible.
+* OpenStreetMap (OSMnx)
+* UN trade flow datasets
+* port throughput statistics
 
-Mitigation:
+---
 
-* statistical estimation
-* trade flow reports
-* synthetic augmentation
+# 9. Dataset Limitations
 
-### Static Cost Assumptions
+---
 
-Transportation costs fluctuate in real markets.
+## Incomplete Real-World Coverage
 
-Mitigation:
+Most supply chain data is proprietary.
 
-Future versions may integrate:
+👉 synthetic augmentation is used.
 
-* live logistics APIs
-* shipping rate feeds
-* fuel cost updates
+---
 
-### Simplified Network Layers
+## Static Assumptions
 
-Real supply chains consist of multiple layers:
+Datasets are static during simulation.
 
-* production
-* transportation
-* distribution
-* retail
+👉 no dynamic updates modeled.
 
-Current architecture simplifies this into a single directed network layer.
+---
 
-Mitigation:
+## Single-Layer Simplification
 
-Future versions will support multi-layer supply chain graphs.
+Real supply chains are multi-layered.
 
-## 8. Summary
+👉 current model flattens layers.
 
-The dataset strategy combines:
+---
 
-* **real-world geospatial infrastructure**
-* **transportation network data**
-* **synthetic network generation**
-* **scalable dataset construction**
+# 10. Summary
 
-This approach enables the Supply Chain Fragility & Risk Analyzer to simulate disruptions and analyze resilience across complex logistics networks.
+The dataset strategy enables:
 
-The resulting datasets support:
+* realistic routing simulation
+* cascade modeling
+* delay estimation
+* business impact analysis
 
-* **routing analysis**
-* **bottleneck detection**
-* **cascading failure simulations**
-* **supply chain fragility assessment**
+The design balances:
+
+* realism
+* simplicity
+* scalability
+
+Future improvements will expand real-world integration and multi-layer modeling.

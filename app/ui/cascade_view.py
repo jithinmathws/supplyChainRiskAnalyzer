@@ -203,7 +203,7 @@ def render_cascade_builder(graph, graph_signature, node_options):
             value=2.0,
             step=0.5,
             key="cascade_delay_penalty_rate",
-            help="Penalty multiplier applied to added route cost for delivered demand.",
+            help="Penalty multiplier applied to additional route time for delivered demand.",
         )
 
     with econ_col3:
@@ -249,7 +249,11 @@ def render_cascade_builder(graph, graph_signature, node_options):
                     unmet_demand_loss_rate=float(unmet_demand_loss_rate),
                 )
 
-                cascade_overview = build_cascade_overview(cascade_result, step_metrics_df)
+                cascade_overview = build_cascade_overview(
+                    cascade_result,
+                    step_metrics_df,
+                    flow_impact_df,
+                )
                 cascade_insight = build_cascade_insight(
                     cascade_result,
                     flow_impact_df,
@@ -280,7 +284,11 @@ def render_cascade_builder(graph, graph_signature, node_options):
                     unmet_demand_loss_rate=float(unmet_demand_loss_rate),
                 )
 
-                cascade_overview = build_cascade_overview(cascade_result, step_metrics_df)
+                cascade_overview = build_cascade_overview(
+                    cascade_result,
+                    step_metrics_df,
+                    flow_impact_df,
+                )
                 cascade_insight = build_cascade_insight(
                     cascade_result,
                     flow_impact_df,
@@ -308,7 +316,7 @@ def render_cascade_analysis_tab(
     cascade_insight,
 ):
     st.subheader("Cascade Simulation")
-    st.write("Simulate rerouting, overload propagation, cascading failures, and economic impact across the network.")
+    st.write("Simulate rerouting, overload propagation, cascading failures, " "route-time delay, and economic impact across the network.")
 
     if cascade_result is None or step_metrics_df is None:
         st.info("Configure a disruption scenario and run cascade simulation to view results.")
@@ -323,11 +331,12 @@ def render_cascade_analysis_tab(
     metric_col5.metric("Failed Nodes", cascade_overview.get("failed_node_count", 0))
     metric_col6.metric("Failed Edges", cascade_overview.get("failed_edge_count", 0))
 
-    econ_metric_col1, econ_metric_col2, econ_metric_col3, econ_metric_col4 = st.columns(4)
+    econ_metric_col1, econ_metric_col2, econ_metric_col3, econ_metric_col4, econ_metric_col5 = st.columns(5)
     econ_metric_col1.metric("Reroute Cost", f"{cascade_overview.get('total_reroute_cost', 0.0):.2f}")
     econ_metric_col2.metric("Delay Penalty", f"{cascade_overview.get('total_delay_penalty', 0.0):.2f}")
     econ_metric_col3.metric("Unmet Demand Loss", f"{cascade_overview.get('total_unmet_demand_loss', 0.0):.2f}")
     econ_metric_col4.metric("Total Economic Impact", f"{cascade_overview.get('total_economic_impact', 0.0):.2f}")
+    econ_metric_col5.metric("Avg Time Increase", f"{cascade_overview.get('avg_time_increase', 0.0):.2f}")
 
     if cascade_insight:
         st.markdown("### Insight")
@@ -362,7 +371,35 @@ def render_cascade_analysis_tab(
 
     st.markdown("### Flow Impact Table")
     if flow_impact_df is not None and not flow_impact_df.empty:
-        st.dataframe(flow_impact_df, use_container_width=True)
+        preferred_order = [
+            "source",
+            "target",
+            "demand",
+            "status",
+            "rerouted",
+            "baseline_path",
+            "final_path",
+            "baseline_time",
+            "final_time",
+            "time_increase",
+            "baseline_cost",
+            "final_cost",
+            "cost_increase",
+            "baseline_hops",
+            "final_hops",
+            "hop_increase",
+            "delivered_demand",
+            "unmet_demand",
+            "reroute_cost",
+            "delay_penalty",
+            "unmet_demand_loss",
+            "total_economic_impact",
+        ]
+
+        cols = [c for c in preferred_order if c in flow_impact_df.columns]
+        flow_impact_display = flow_impact_df[cols]
+
+        st.dataframe(flow_impact_display, use_container_width=True)
 
         st.download_button(
             label="📥 Download Flow Impact Results (CSV)",

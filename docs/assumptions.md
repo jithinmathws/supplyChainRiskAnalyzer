@@ -2,265 +2,304 @@
 
 ## Supply Chain Fragility & Risk Analyzer
 
-This document outlines **core modeling assumptions** underlying the Supply Chain Fragility & Risk Analyzer.
+This document outlines the **core modeling assumptions** underlying the Supply Chain Fragility & Risk Analyzer.
 
-All simulation systems require **simplifying assumptions** in order to make complex real-world systems computationally tractable. These assumptions define how the supply chain network is represented, how disruptions are modeled, and how operational and financial impacts are estimated.
+All simulation systems require simplifying assumptions to make complex real-world supply chains computationally tractable. These assumptions define how the network is modeled, how disruptions are simulated, and how operational and financial impacts are estimated.
 
-Clearly documenting these assumptions ensures:
+Documenting these assumptions ensures:
 
-* **Transparency** in analytical methodology
-* **Reproducibility** of simulation experiments
-* **Proper interpretation** of model outputs
+* **Transparency** in methodology
+* **Reproducibility** of simulations
+* **Correct interpretation** of results
 
-The assumptions described here apply to the **current system implementation (MVP)**.
+These assumptions apply to the **current system implementation (MVP)**.
 
 ---
 
 # 1. Overview
 
-This document outlines the core modeling assumptions underlying the Supply Chain Fragility & Risk Analyzer.
+The system models supply chains as:
 
-All simulation systems require simplifying assumptions in order to make complex real-world systems computationally tractable. These assumptions define how the supply chain network is represented, how disruptions are modeled, and how operational and financial impacts are estimated.
+* **flow-driven networks**
+* **time-weighted graphs**
+* **capacity-constrained systems**
 
-Clearly documenting these assumptions ensures:
-
-Transparency in analytical methodology
-
-Reproducibility of simulation experiments
-
-Proper interpretation of model outputs
-
-The assumptions described here apply to the current system implementation (MVP).
-
-# 2. Network Representation Assumptions
-
-The system models supply chains as **directed graphs**:
-
-```
-G = (V, E)
-```
-
-**Where:**
-
-* `V` represents infrastructure nodes
-* `E` represents transportation connections
-
-Several assumptions are made regarding this network structure.
-
-## 2.1 Infrastructure as Discrete Nodes
-
-Each supply chain location is modeled as a **single node** within the network.
-
-**Examples include:**
-
-* ports
-* manufacturing plants
-* warehouses
-* distribution centers
-
-The model assumes that each node represents a **distinct, atomic operational entity**, even though real-world facilities may consist of multiple subcomponents.
-
-## 2.2 Transportation as Directed Edges
-
-Transportation routes are represented as **directed edges** connecting nodes.
-
-Edges represent potential logistics flows such as:
-
-* maritime shipping routes
-* trucking corridors
-* rail connections
-* air freight routes
-
-Edges are assumed to represent **available transport pathways**, although model does not explicitly represent contractual shipping relationships.
-
-## 2.3 Single-Layer Network Model
-
-The current implementation represents supply chain as a **single-layer logistical network**.
-
-Real supply chains consist of **multiple interconnected layers**, including:
-
-* raw material extraction
-* manufacturing
-* transportation
-* distribution
-* retail
-
-These layers are **flattened into a single network** to simplify graph structure and analytical computations.
-
-# 3. Static Network Structure
-
-The model assumes that **network topology remains fixed** during a single simulation run.
-
-This means that:
-
-* Nodes do not dynamically appear or disappear (except during targeted disruption injections)
-* New transportation routes are not created dynamically during simulations
-* Organizations do not dynamically reroute shipments mid-transit
-
-In real-world supply chains, companies actively adapt to disruptions by sourcing alternative suppliers or rerouting shipments. These adaptive behaviors are **not currently modeled**.
+While realistic, the model still simplifies several real-world behaviors.
 
 ---
 
-# 4. Infrastructure Capacity Assumptions
+# 2. Network Representation Assumptions
 
-The current model assumes that all nodes and edges have **unlimited capacity**.
+---
 
-This implies that:
+## 2.1 Infrastructure as Discrete Nodes
 
-* ports can process unlimited cargo
-* warehouses can store unlimited goods
-* transportation routes cannot become congested to point of total gridlock
+Each facility is modeled as a **single node**.
 
-In practice, supply chain infrastructure has **strict operational limits**, such as:
+Examples:
 
-* port TEU throughput limits
-* warehouse storage capacity
-* trucking fleet availability
-* rail corridor capacity
+* ports
+* factories
+* warehouses
 
-Ignoring capacity constraints simplifies network analysis but relies on centrality metrics to infer congestion risk rather than modeling explicit throughput limits.
+👉 Real-world facilities may contain multiple subsystems, but are treated as **atomic units**.
+
+---
+
+## 2.2 Transportation as Directed Edges
+
+Edges represent transport routes:
+
+* shipping
+* rail
+* road
+* air
+
+👉 Edges represent **available paths**, not contractual logistics relationships.
+
+---
+
+## 2.3 Single-Layer Network
+
+The model uses a **single-layer network**.
+
+👉 Real supply chains are multi-layered (supplier → manufacturing → distribution → retail), but are flattened for simplicity.
+
+---
+
+# 3. Static Topology Assumption
+
+During a simulation:
+
+* no new nodes are created
+* no new routes are added
+* only disruptions remove components
+
+👉 Real systems adapt dynamically, but **adaptive logistics strategies are not modeled**.
+
+---
+
+# 4. Capacity Modeling Assumptions
+
+---
+
+## 4.1 Edge Capacity Constraints (Modeled)
+
+Each edge has a fixed capacity:
+
+```id="assump1"
+C_e
+```
+
+Flow exceeding capacity results in failure:
+
+```id="assump2"
+L_e > C_e
+```
+
+---
+
+## 4.2 Node Capacity Simplification
+
+Node-level capacity is not explicitly enforced during routing.
+
+👉 Congestion is modeled primarily at the **edge level**, not at facilities.
+
+---
+
+## 4.3 No Partial Capacity Reduction
+
+Edges either:
+
+* operate normally
+* fail completely
+
+👉 Gradual degradation (e.g., 50% capacity) is not modeled.
 
 ---
 
 # 5. Disruption Modeling Assumptions
 
-Disruptions are represented using **simplified structural models**.
-
 ---
 
 ## 5.1 Binary Failure Model
 
-Infrastructure disruptions are modeled as **binary failures**.
+Components are either:
 
-A node or edge is assumed to be either:
+* operational
+* removed
 
-* fully operational
-* completely removed from network
-
-Partial failures (such as reduced capacity, congestion, or labor slowdowns) are **not represented** in the current model.
+👉 Partial disruptions (delays, slowdowns) are not represented.
 
 ---
 
-## 5.2 Instantaneous Disruptions
+## 5.2 Instantaneous Disruption
 
-Disruptions are assumed to occur **instantaneously** during simulation.
+Disruptions occur instantly at simulation start.
 
-The model does not currently simulate:
+👉 No modeling of:
 
-* gradual infrastructure degradation
-* phased disruption events
+* gradual failure
 * recovery timelines
+* phased disruptions
+
+---
 
 # 6. Routing Assumptions
 
-Supply chain flows are assumed to follow **shortest-path routing** within the network.
-
-Routing decisions are determined using **Dijkstra's Algorithm**, optimizing for minimal transportation distance or travel time.
-
-Real-world routing decisions may also consider:
-
-* contractual obligations
-* inventory levels
-* geopolitical constraints
-* carrier availability
-
-These factors are **not explicitly represented** in the current framework.
-
 ---
 
-# 7. Risk and Cost Estimation Assumptions
+## 6.1 Shortest-Time Routing
 
-Operational and financial impacts are estimated using **simplified linear models**.
+Flows are routed using:
 
----
-
-## 7.1 Throughput-Based Value Estimation
-
-Each node is assigned an estimated **daily throughput value**, representing the economic value of goods moving through that location.
-
-This value is used to approximate the financial impact of disruptions.
-
----
-
-## 7.2 Linear Cost Estimation
-
-Financial disruption impacts are estimated using a **simplified linear equation**:
-
-```
-Cost_Impact = Delay × Daily_Throughput_Value
+```id="assump3"
+shortest path (weight = time)
 ```
 
-This assumes that financial losses increase linearly with supply chain delays.
+👉 Other real-world constraints are not modeled:
 
-Real-world financial outcomes may involve:
-
-* nonlinear economic effects
-* contractual penalties
-* inventory buffers
-* supply substitution strategies
-
-These factors are **not currently modeled**.
+* contracts
+* pricing agreements
+* geopolitical restrictions
 
 ---
 
-# 8. Disruption Scenario Assumptions
+## 6.2 Deterministic Routing
 
-The simulation engine evaluates network fragility using **randomized and targeted disruption scenarios**.
+All routing is deterministic.
 
-**Examples include:**
-
-* random infrastructure failures
-* targeted attacks on highly central nodes
-* transportation route disruptions
-
-These scenarios are used to explore **systemic vulnerabilities**, rather than predict specific real-world future events.
+👉 No stochastic variation or uncertainty is included.
 
 ---
 
-# 9. Simulation Experiment Assumptions
+# 7. Flow Modeling Assumptions
 
-Monte Carlo simulation experiments assume that **disruption events occur independently** across iterations.
+---
 
-Each simulation run:
+## 7.1 Fixed Demand
 
-* randomly selects disruption targets
-* recalculates network metrics
-* records resulting impacts
+Each flow has fixed demand:
 
-The statistical outputs therefore represent **probabilistic estimates** of network resilience, rather than deterministic predictions.
+```id="assump4"
+d_k
+```
 
-# 10. Scope of Modeling Framework
+👉 Demand does not change dynamically during simulation.
 
-The Supply Chain Fragility & Risk Analyzer is designed primarily as a **structural network analysis framework**.
+---
+
+## 7.2 No Inventory Buffering
+
+The model assumes:
+
+* no storage buffering
+* no delayed fulfillment
+
+👉 Unmet demand is immediately counted as loss.
+
+---
+
+# 8. Cascade Simulation Assumptions
+
+---
+
+## 8.1 Load-Based Failure
+
+Failures propagate via:
+
+```id="assump5"
+edge load → capacity violation → edge removal
+```
+
+👉 This models congestion-driven collapse.
+
+---
+
+## 8.2 Discrete Time Steps
+
+Simulation evolves in discrete steps.
+
+👉 Continuous-time dynamics are not modeled.
+
+---
+
+# 9. Economic Modeling Assumptions
+
+---
+
+## 9.1 Linear Cost Functions
+
+Economic impact is computed using linear models:
+
+* reroute cost
+* delay penalty
+* unmet demand loss
+
+👉 Nonlinear effects (e.g., cascading financial shocks) are not included.
+
+---
+
+## 9.2 No Market Dynamics
+
+The model does not consider:
+
+* pricing changes
+* supply substitution
+* demand elasticity
+
+---
+
+# 10. Scenario Assumptions
+
+Simulations represent **hypothetical stress tests**, not predictions.
+
+Scenarios include:
+
+* node disruptions
+* edge failures
+* multi-point failures
+
+👉 Results should be interpreted as **analytical insights**, not forecasts.
+
+---
+
+# 11. Scope Limitations
 
 The system focuses on:
 
-* supply chain topology
-* infrastructure connectivity
-* disruption propagation through network structure
+* network structure
+* flow dynamics
+* disruption propagation
+* economic impact
 
-The model does not currently represent **behavioral or organizational decision-making processes**, such as procurement strategy or logistics management.
+It does NOT model:
+
+* organizational decision-making
+* procurement strategies
+* real-time logistics adaptation
 
 ---
 
-# 11. Summary
+# 12. Summary
 
-The Supply Chain Fragility & Risk Analyzer relies on several **simplifying assumptions** to enable tractable simulation of complex supply chain networks.
+The system makes several simplifying assumptions:
 
-**Key assumptions include:**
+* supply chains represented as graphs
+* time-based deterministic routing
+* capacity-driven cascading failures
+* binary disruption modeling
+* linear economic impact estimation
 
-* **supply chains represented as directed graphs**
-* **static network topology during simulation**
-* **unlimited infrastructure capacity**
-* **binary disruption models**
-* **shortest-path routing behavior**
-* **simplified financial impact estimation**
+These assumptions enable a balance between:
 
-These assumptions allow the system to focus on **structural fragility** and **disruption propagation dynamics** while maintaining computational efficiency.
+* **model realism**
+* **computational tractability**
+* **interpretability**
 
-Future system enhancements may relax several of these assumptions by incorporating:
+Future improvements may include:
 
-* **multi-layer supply chain models**
-* **capacity constraints**
-* **partial infrastructure failures**
-* **behavioral adaptation models**
+* stochastic demand
+* partial capacity failures
+* recovery modeling
+* multi-layer supply chain representation

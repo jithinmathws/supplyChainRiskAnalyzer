@@ -98,7 +98,7 @@ def run_cascade_analysis_cached(
     return result, step_metrics_df, flow_impact_df
 
 
-def build_cascade_overview(result, step_metrics_df):
+def build_cascade_overview(result, step_metrics_df, flow_impact_df=None):
     metrics = result.get("metrics", {})
 
     collapse_step = None
@@ -106,6 +106,14 @@ def build_cascade_overview(result, step_metrics_df):
         collapsed_rows = step_metrics_df[step_metrics_df["routed_demand"] == 0]
         if not collapsed_rows.empty:
             collapse_step = collapsed_rows.iloc[0]["step"]
+
+    avg_time_increase = 0.0
+    if flow_impact_df is not None and not flow_impact_df.empty and "time_increase" in flow_impact_df.columns:
+        positive_time = flow_impact_df["time_increase"].fillna(0.0)
+        positive_time = positive_time[positive_time > 0]
+
+        if not positive_time.empty:
+            avg_time_increase = float(positive_time.mean())
 
     return {
         "total_flows": metrics.get("total_flows", 0),
@@ -118,6 +126,7 @@ def build_cascade_overview(result, step_metrics_df):
         "total_delay_penalty": metrics.get("total_delay_penalty", 0.0),
         "total_unmet_demand_loss": metrics.get("total_unmet_demand_loss", 0.0),
         "total_economic_impact": metrics.get("total_economic_impact", 0.0),
+        "avg_time_increase": avg_time_increase,
         "collapse_step": int(collapse_step) if collapse_step is not None else None,
     }
 
@@ -139,10 +148,21 @@ def build_cascade_insight(result, flow_impact_df, step_metrics_df):
 
     rerouted_count = 0
     delivered_count = 0
+    total_time_increase = 0.0
+    avg_time_increase = 0.0
 
-    if flow_impact_df is not None and not flow_impact_df.empty and "status" in flow_impact_df.columns:
-        rerouted_count = int((flow_impact_df["status"] == "rerouted").sum())
-        delivered_count = int((flow_impact_df["status"] == "delivered").sum())
+    if flow_impact_df is not None and not flow_impact_df.empty:
+        if "status" in flow_impact_df.columns:
+            rerouted_count = int((flow_impact_df["status"] == "rerouted").sum())
+            delivered_count = int((flow_impact_df["status"] == "delivered").sum())
+
+        if "time_increase" in flow_impact_df.columns:
+            positive_time = flow_impact_df["time_increase"].fillna(0.0)
+            positive_time = positive_time[positive_time > 0]
+
+            if not positive_time.empty:
+                total_time_increase = float(positive_time.sum())
+                avg_time_increase = float(positive_time.mean())
 
     secondary_failures = False
     if (
@@ -169,7 +189,13 @@ def build_cascade_insight(result, flow_impact_df, step_metrics_df):
             "indicating partial resilience through alternate paths."
         )
     elif delivered_count > 0:
-        parts.append(f"{delivered_count} flow{'s remained' if delivered_count != 1 else ' remained'} serviceable " "without rerouting.")
+        parts.append(f"{delivered_count} flow{'s remained' if delivered_count != 1 else ' remained'} " "serviceable without rerouting.")
+
+    if total_time_increase > 0:
+        parts.append(
+            f"Rerouted flows incurred a total time increase of {total_time_increase:.2f}, "
+            f"with an average increase of {avg_time_increase:.2f} per affected flow."
+        )
 
     if secondary_failures:
         parts.append("Secondary failures occurred after the initial shock, showing that disruption propagated through the network.")

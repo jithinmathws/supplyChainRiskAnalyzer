@@ -1,329 +1,309 @@
 # Simulation Engine
+
 ## Supply Chain Fragility & Risk Analyzer
 
-The Simulation Engine is the core analytical component of the Supply Chain Fragility & Risk Analyzer. It evaluates how disruptions affect logistics networks by simulating infrastructure failures and measuring their impact on routing efficiency, network connectivity, and supply chain resilience.
+The Simulation Engine is the core analytical component of the **Supply Chain Fragility & Risk Analyzer**.
 
-By performing graph-based simulations, the engine identifies critical infrastructure nodes, detects cascading failures, and translates network topology changes into operational delays.
+It evaluates how disruptions affect logistics networks by simulating **flow-driven routing behavior**, **capacity-constrained cascading failures**, and their resulting **operational and economic impacts**.
+
+Unlike traditional network-failure models that focus on topology alone, this system models supply chains as dynamic systems where:
+
+* demand flows determine network stress
+* disruptions propagate through rerouting
+* overload causes secondary failures
+* impacts are measured at both network and business levels
 
 ---
 
 # 1. Purpose
 
-The simulation engine analyzes how disruptions propagate through supply chain networks.
+The simulation engine analyzes how disruptions propagate across supply chain networks under real-world operational constraints.
 
-Its purpose is to help analysts understand how localized failures can spread through logistics infrastructure and impact the entire supply chain system.
+Its purpose is to help analysts understand:
+
+* how flows reroute under disruption
+* where congestion emerges
+* how cascading failures evolve
+* how disruptions translate into cost and delay
 
 ---
 
-# 2. Simulation Objectives
+# 2. Core Design Principles
 
-The system evaluates disruption scenarios to measure supply chain vulnerability.
+### Flow-Driven Simulation
 
-Primary objectives include:
+The system models **demand flows explicitly**, rather than analyzing static topology.
 
-- Identifying critical infrastructure nodes  
-- Simulating node failures (random and targeted)  
-- Detecting cascading congestion  
-- Measuring network fragility  
-- Estimating operational delays  
-- Translating disruptions into financial impact  
+---
 
-These capabilities allow decision-makers to understand how localized disruptions can propagate across global logistics networks.
+### Time-Based Routing
+
+All routing decisions use:
+
+```id="simroute"
+shortest path (weight = time)
+```
+
+This enables realistic delay modeling.
+
+---
+
+### Capacity-Constrained Cascades
+
+Failures propagate through **load accumulation and overload**, not centrality shifts.
+
+---
+
+### Business-Oriented Outputs
+
+Simulation results translate directly into:
+
+* delay
+* unmet demand
+* economic loss
 
 ---
 
 # 3. Network Representation
 
-The supply chain network is represented as a directed graph.
+The supply chain network is represented as:
 
+```id="simgraph"
 G = (V, E)
+```
 
 Where:
 
-- **V** = set of infrastructure nodes  
-- **E** = set of transportation edges  
+* **V** = infrastructure nodes
+* **E** = transport edges
 
-### Example Node Types
+The system uses:
 
-- ports  
-- factories  
-- warehouses  
-- logistics hubs  
-
-### Example Edge Types
-
-- shipping routes  
-- rail corridors  
-- road freight routes  
-
-This graph representation allows the system to apply network science methods for disruption analysis.
+```id="simgraph2"
+NetworkX MultiDiGraph
+```
 
 ---
 
-# 4. Disruption Simulation Framework
+## Node Examples
 
-Disruptions are modeled as **node removal events** within the network graph.
+* suppliers
+* factories
+* ports
+* warehouses
 
-These events represent real-world failures such as:
+---
 
-- port closures  
-- factory shutdowns  
-- infrastructure damage  
-- labor strikes  
-- geopolitical trade restrictions  
+## Edge Attributes
 
-When a node fails, the simulation evaluates how the remaining network reorganizes its routing structure.
+* capacity
+* cost
+* **weight (time)**
+
+---
+
+# 4. Disruption Model
+
+Disruptions are modeled as removal of:
+
+* nodes
+* edges
+
+These represent real-world events such as:
+
+* port closures
+* infrastructure outages
+* strikes
+* disasters
 
 ---
 
 # 5. Simulation Workflow
 
-The simulation process follows a multi-stage analytical workflow.
+---
+
+## Step 1 — Initialization
+
+The engine loads the prepared graph and baseline flows.
+
+Baseline routing is computed for each flow:
+
+* baseline path
+* baseline time
+* baseline cost
 
 ---
 
-## Step 1 — Graph Initialization
+## Step 2 — Disruption Injection
 
-The simulation loads the processed datasets:
+Selected nodes and/or edges are removed from the network.
 
-- `nodes.csv`
-- `edges.csv`
+This produces the initial disrupted state.
 
-These datasets are converted into a directed graph using NetworkX.
+---
 
-Example:
+## Step 3 — Flow Routing
 
-```python
-G = nx.DiGraph()
+For each simulation step:
+
+1. All flows attempt routing using shortest paths
+2. Delivered and disrupted flows are recorded
+
+Outputs tracked:
+
+* final path
+* delivered demand
+* unmet demand
+
+---
+
+## Step 4 — Load Accumulation
+
+Edge loads are computed:
+
+```id="simload"
+edge_load = Σ(flow_demand routed through edge)
 ```
 
-Nodes and edges are added along with their associated attributes.
+---
+
+## Step 5 — Overload Detection
+
+Edges exceeding capacity fail:
+
+```id="simfail"
+edge_load > capacity → edge removed
+```
+
+This triggers cascading propagation.
 
 ---
 
-## Step 2 — Baseline Network Analysis
+## Step 6 — Iteration
 
-Before disruptions occur, the system calculates baseline network metrics representing the normal operating state.
+Steps repeat until:
 
-Baseline metrics include:
-
-- shortest path routing
-- degree centrality
-- betweenness centrality
-- closeness centrality
-- average path length
-- network efficiency
-
-These values represent the **reference state of the network** before disruptions.
+* no new failures occur
+  OR
+* maximum steps reached
 
 ---
 
-## Step 3 — Disruption Injection
-
-A disruption is introduced by removing a selected node.
-
-Example:
-
-Remove node: Port_Rotterdam
-
-Graph update:
-
-$$
-G' = G - \{v_k\}
-$$
-
-All edges connected to the disrupted node are removed.
-
-This produces the **post-disruption network state**.
+# 6. Output Metrics
 
 ---
 
-## Step 4 — Network Recalculation
+## 6.1 Flow-Level Metrics
 
-After the disruption, the system recomputes routing paths across the network.
+For each flow:
 
-Updated metrics include:
-
-- new shortest paths
-- routing detours
-- congestion redistribution
-- updated centrality values
-
-These recalculations reveal how traffic is redistributed across the remaining infrastructure.
+* baseline vs final path
+* rerouting status
+* delivered vs unmet demand
+* **time increase (delay)**
+* cost increase
+* hop change
 
 ---
 
-## Step 5 — Cascading Failure Detection
+## 6.2 System-Level Metrics
 
-When a major node fails, traffic is rerouted through alternative infrastructure.
-
-This can overload secondary nodes.
-
-The system detects secondary bottlenecks by measuring changes in **betweenness centrality**.
-
-Congestion shift metric:
-
-$$
-\Delta CB(v) = CB_{\text{after}}(v) - CB_{\text{before}}(v)
-$$
-
-Where:
-
-- **CB_before** = betweenness centrality before disruption  
-- **CB_after** = betweenness centrality after disruption  
-
-Nodes with large increases in centrality are classified as **secondary risk nodes**.
+* service level
+* disrupted flows
+* unmet demand
+* failed nodes/edges
+* total economic impact
 
 ---
 
-# 6 — Fragility Assessment
+## 6.3 Step-Level Metrics
 
-The system evaluates how disruptions affect overall network connectivity.
-
-Fragility is measured using the **Largest Connected Component (LCC)**.
-
-$$
-\text{Fragility} = 1 - \frac{|C_{\text{largest}}'|}{|C_{\text{largest}}|}
-$$
-
-Where:
-
-- **Clargest** = largest connected component before disruption  
-- **Clargest'** = largest connected component after disruption  
-
-### Fragility Interpretation
-
-| Fragility Value | Interpretation |
-|----------------|---------------|
-| Near 0 | Network remains resilient |
-| Moderate | Partial fragmentation |
-| High | Severe network breakdown |
+* routed demand per step
+* new failures
+* cumulative failures
 
 ---
 
-# 7 — Routing Impact Analysis
+# 7. Economic Impact Modeling
 
-Disruptions often increase transportation distances and delivery times.
-
-Routing efficiency is evaluated using the change in average path length.
-
-$$
-\Delta L = L_{\text{after}} - L_{\text{before}}
-$$
-
-Where:
-
-- **L_before** = baseline average path length  
-- **L_after** = post-disruption path length  
-
-Large increases indicate logistics inefficiency caused by forced rerouting.
+The engine translates disruptions into decision-ready KPIs.
 
 ---
 
-# 8. Business Impact Estimation
+## Reroute Cost
 
-The simulation translates network disruptions into operational and financial metrics.
-
----
-
-## 8.1 Delivery Delay
-
-Estimated delay caused by the disruption:
-
-$$
-\text{Delay} = \Delta L \times T_{\text{edge}}
-$$
-
-Where:
-
-- **ΔL** = increase in average path length  
-- **T_edge** = average transit time per edge  
+```id="simcost1"
+(cost increase × demand × reroute_cost_rate)
+```
 
 ---
 
-## 8.2 Financial Impact
+## Delay Penalty
 
-Cost impact is estimated using throughput values.
-
-$$
-\text{Cost\_Impact} = \text{Delay} \times \text{Daily\_Throughput\_Value}
-$$
-
-Example:
-- Delay = 3 days
-- Daily throughput value = $400,000
-- Estimated cost impact = $1.2M
-
+```id="simcost2"
+(time increase × demand × delay_penalty_rate)
+```
 
 ---
 
-# 9. Simulation Scenarios
+## Unmet Demand Loss
 
-The system supports multiple disruption scenarios.
-
----
-
-## Single Node Failure
-
-Simulates isolated events such as:
-
-- port closures  
-- factory shutdowns  
+```id="simcost3"
+(unmet demand × unmet_demand_loss_rate)
+```
 
 ---
 
-## Multi-Node Disruption
+## Total Economic Impact
 
-Simulates large-scale events such as:
-
-- regional disasters  
-- geopolitical conflicts  
-- infrastructure failures across multiple nodes  
+```id="simcost4"
+reroute_cost + delay_penalty + unmet_demand_loss
+```
 
 ---
 
-## Targeted Infrastructure Attack
+# 8. Scenario Support
 
-Tests the impact of removing highly central nodes such as:
-
-- major global ports  
-- key logistics hubs  
-- international rail junctions  
+The engine supports:
 
 ---
 
-# 10. Monte Carlo Simulation (Future Extension)
+## Single Disruption
 
-To evaluate systemic risk, future versions of the system may run repeated simulations using randomized disruptions.
-
-### Monte Carlo Procedure
-
-1. Randomly select disruption nodes  
-2. Run failure simulation  
-3. Record network metrics  
-4. Repeat across multiple iterations  
-
-Example:
-- iterations = 1000
-
-This approach helps identify:
-
-- statistically critical infrastructure  
-- high-risk network regions  
-- systemic vulnerabilities  
+Localized failures such as port closures.
 
 ---
 
-# 11. Output Metrics
+## Multi-Component Disruption
 
-Each simulation produces several analytical outputs.
+Regional shocks or system failures.
 
-Key outputs include:
+---
 
-- disrupted nodes  
-- network fragility score  
-- congestion shift values  
-- routing delay  
-- cost impact estimate  
+## Flow-Based Stress Testing
 
-These outputs allow analysts to understand both the **structural and economic consequences** of supply chain disruptions.
+Evaluates performance under demand scenarios.
+
+---
+
+# 9. Future Extensions
+
+Planned enhancements:
+
+* stochastic disruptions
+* Monte Carlo simulations
+* recovery-time modeling
+* multi-layer supply chain networks
+
+---
+
+# Conclusion
+
+The Simulation Engine combines:
+
+* flow-based modeling
+* capacity-aware cascading logic
+* time-based routing
+* business impact translation
+
+into a unified simulation framework for analyzing real-world supply chain resilience.
